@@ -28,18 +28,16 @@ usage() {
 
 选项:
   -k, --keep ITEM      指定要保留的文件或目录（可多次使用）
-  --all                显式表示清理所有内容（不保留任何东西）
   -h, --help           显示此帮助信息
 
 注意：
-  - 必须显式指定 --all 或至少一个 --keep，否则脚本拒绝运行。
+  - 必须显式指定 --keep，否则脚本拒绝运行。
   - 目标目录本身不会被删除，只清理其内容。
 EOF
 }
 
 # 初始化变量
 declare -a KEEP_ITEMS=()
-CLEAN_ALL=false
 CONFIRM_TO_YES=false
 TARGET_DIR=$(pwd)
 
@@ -53,10 +51,6 @@ while [ $# -gt 0 ]; do
             fi
             KEEP_ITEMS+=("$2")
             shift 2
-            ;;
-        -a|--all)
-            CLEAN_ALL=true
-            shift
             ;;
         -y|--yes)
             CONFIRM_TO_YES=true
@@ -77,9 +71,9 @@ done
 log "INFO" "🚀 开始清理当前目录"
 log "INFO" ""
 
-# 检查参数逻辑：必须显式指定 --all 或至少一个 --keep
-if [ "$CLEAN_ALL" = false ] && [ ${#KEEP_ITEMS[@]} -eq 0 ]; then
-    log "ERROR" "必须指定 --all（清理全部）或至少一个 --keep（保留项）" >&2
+# 检查参数逻辑：必须显式指定 --keep
+if [ ${#KEEP_ITEMS[@]} -eq 0 ]; then
+    log "ERROR" "必须指定 --keep（保留项）" >&2
     exit 1
 fi
 
@@ -100,9 +94,10 @@ fi
 cd "$TARGET_DIR"
 
 # 使用 find 命令获取所有非隐藏项
-mapfile -t ALL_ITEMS < <(find . -maxdepth 1 -name "[!.]*" -print 2>/dev/null)
-# 去除开头的 "./"
-ALL_ITEMS=("${ALL_ITEMS[@]#./}")
+ALL_ITEMS=()
+while IFS= read -r -d $'\0' item; do
+    ALL_ITEMS+=("${item#./}")
+done < <(find . -maxdepth 1 -name "[!.]*" -print0 2>/dev/null)
 
 # 如果目录为空，直接退出
 if [ ${#ALL_ITEMS[@]} -eq 0 ]; then
@@ -115,21 +110,18 @@ declare -a TO_DELETE=()
 
 for item in "${ALL_ITEMS[@]}"; do
     should_keep=false
-    for keep in "${KEEP_ITEMS[@]}"; do
-        if [ "$item" = "$keep" ]; then
-            should_keep=true
-            break
-        fi
-    done
+    if [ ${#KEEP_ITEMS[@]} -gt 0 ]; then
+        for keep in "${KEEP_ITEMS[@]}"; do
+            if [ "$item" = "$keep" ]; then
+                should_keep=true
+                break
+            fi
+        done
+    fi
     if [ "$should_keep" = false ]; then
         TO_DELETE+=("$item")
     fi
 done
-
-# 如果 --all 模式，TO_DELETE 应等于 ALL_ITEMS
-if [ "$CLEAN_ALL" = true ]; then
-    TO_DELETE=("${ALL_ITEMS[@]}")
-fi
 
 # 如果没有要删除的，提示并退出
 if [ ${#TO_DELETE[@]} -eq 0 ]; then
@@ -151,7 +143,7 @@ if [[ "$CONFIRM_TO_YES" == "true" ]]; then
 fi
 
 # 执行删除
-log "INFO" "即将删除以下内容（位于: $TARGET_DIR）:"
+log "INFO" "即将删除以下内容（位于: ${TARGET_DIR}）:"
 printf '  %s\n' "${TO_DELETE[@]}"
 echo -n "确认删除? (y/N): "
 read -r confirm
