@@ -1,0 +1,978 @@
+#!/bin/bash
+# Zhiren - Autonomous AI development system
+#
+# Commands:
+#   zhiren refresh <notes.md>       - Add tasks from freeform notes
+#   zhiren task [opts] "desc"       - Run isolated single-task mode
+#   zhiren [opts] [n]               - Run n iterations (default 25)
+#   zhiren --rebuild                - Force rebuild Docker image (safe mode only)
+#   zhiren --disable-auto-update    - Disable automatic update checks
+#   zhiren --enable-auto-update     - Re-enable automatic update checks
+#
+# Main loop options:
+#   --batch             - Enable batch mode (up to 5 related tasks per iteration)
+#   --batch=N, -bN      - Enable batch mode with custom size (up to N tasks)
+#                         Tasks are grouped by natural relatedness, not forced
+#
+# Task mode options:
+#   --safe              - Run in Docker container
+#   -f, --file <file>   - Read task description from file
+#   --branch <name>     - Use custom branch name
+#   --no-pr             - Skip PR creation
+#   -n <num>            - Max iterations (default 25)
+#
+# Safe mode (--safe): Runs Claude in a Docker container that can only access
+# the project directory. Use for unattended runs to prevent accidental
+# damage to other files on the system.
+#
+# Loop: PLAN → EXECUTE → REVIEW → FIX
+#
+# Task mode: Isolated single-task fixes. Does NOT touch CONTEXT.md, TASKS.md.
+# Uses .zhiren/tasks/<task-id>/ for state. Auto-creates branch and PR if git/gh available.
+#
+# idea.md/notes.md are freeform - write whatever you want. Zhiren will figure it out.
+
+# -e: 命令失败时立即退出
+# -u: 使用未定义变量时报错
+set -eu
+
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+# Instance-specific temp folder for verbose command output
+# Uses PID + timestamp for uniqueness across concurrent instances
+ZHIREN_INSTANCE_ID="$$_$(date +%s)"
+ZHIREN_TMP_DIR="/tmp/zhiren-${ZHIREN_INSTANCE_ID}"
+export ZHIREN_TMP_DIR
+
+# 场景
+export ZHIREN_EXECUTE_SCENE=""
+
+# Source library components
+source "$SCRIPT_DIR/lib/tools.sh"
+source "$SCRIPT_DIR/lib/consts.sh"
+
+# session相关变量
+ZHIREN_CLAUDE_SESSION_FILE="${PROJECT_ZHIREN_DIR}/claude_session_id"
+
+# Source library components
+source "$SCRIPT_DIR/lib/log.sh"
+source "$SCRIPT_DIR/lib/prompts.sh"
+source "$SCRIPT_DIR/lib/safe_mode.sh"
+source "$SCRIPT_DIR/lib/claude.sh"
+
+log "LIGHT" "🚀 Starting Zhiren script..."
+log "INFO" "ZHIREN_EXECUTE_SCENE=$ZHIREN_EXECUTE_SCENE"
+log "INFO" "SCRIPT_DIR=$SCRIPT_DIR"
+log "INFO" "ZHIREN_HOME=$ZHIREN_HOME"
+log "INFO" "ZHIREN_PROJECT_ROOT=$ZHIREN_PROJECT_ROOT"
+log "INFO" "LOG_DIR=$LOG_DIR"
+log "INFO" "LOG_FILE=$LOG_FILE"
+log "INFO" "ZHIREN_TMP_DIR=$ZHIREN_TMP_DIR"
+log "INFO" "ZHIREN_CLAUDE_SESSION_FILE=$ZHIREN_CLAUDE_SESSION_FILE"
+log "INFO" ""
+
+# Instance-specific temp folder for verbose command output
+mkdir -p "$ZHIREN_TMP_DIR"
+
+# Cleanup function for temp folder
+cleanup_temp() {
+    if [[ -d "$ZHIREN_TMP_DIR" ]]; then
+        rm -rf "$ZHIREN_TMP_DIR"
+    fi
+}
+
+ZHIREN_CLAUDE_SESSION_IS_NEW=""
+ZHIREN_CLAUDE_SESSION_ID=""
+init_claude_session() {
+    if [[ -n "$ZHIREN_CLAUDE_SESSION_IS_NEW" ]] && [[ -n "$ZHIREN_CLAUDE_SESSION_ID" ]]; then
+        # 两个变量都不为空时
+        return 0
+    fi
+    # echo "[init_claude_session]ZHIREN_CLAUDE_SESSION_IS_NEW=$ZHIREN_CLAUDE_SESSION_IS_NEW,ZHIREN_CLAUDE_SESSION_ID=$ZHIREN_CLAUDE_SESSION_ID" >&2
+
+    # 检查文件是否存在且不为空
+    if [[ ! -f "$ZHIREN_CLAUDE_SESSION_FILE" ]] || [[ ! -s "$ZHIREN_CLAUDE_SESSION_FILE" ]]; then
+        # 文件不存在或为空
+        local session_id=$(uuidgen)
+        echo -n "$session_id" > "$ZHIREN_CLAUDE_SESSION_FILE"
+
+        ZHIREN_CLAUDE_SESSION_IS_NEW="true"
+        ZHIREN_CLAUDE_SESSION_ID="$session_id"
+    else
+        # 读取文件内容到变量，去除首尾空白字符
+        local session_id=$(<"$ZHIREN_CLAUDE_SESSION_FILE")
+        ZHIREN_CLAUDE_SESSION_IS_NEW="false"
+        ZHIREN_CLAUDE_SESSION_ID="$session_id"
+    fi
+
+    log "LIGHT" "Claude session initialization completed. is_new:$ZHIREN_CLAUDE_SESSION_IS_NEW, session_id:$ZHIREN_CLAUDE_SESSION_ID." >&2
+}
+
+get_claude_session_is_new() {
+    echo "$ZHIREN_CLAUDE_SESSION_IS_NEW"
+}
+
+get_claude_session_id() {
+    echo "$ZHIREN_CLAUDE_SESSION_ID"
+}
+
+# Trap signals to ensure cleanup on exit (normal, interrupt, terminate)
+# INT: 用户按下 Ctrl+C 时发送的中断信号，和SIGINT等同。
+# TERM: 系统发送的终止信号（如 kill 命令），和SIGTERM等同。
+# EXIT: 是伪信号，仅在脚本退出时触发（无论是正常退出还是被信号中断），会捕获以下所有情况：
+#   1. 脚本正常执行结束
+#   2. exit 命令
+#   3. 任何信号导致的退出
+#   4. 脚本中任何错误（如果有set -e）
+trap cleanup_temp EXIT INT TERM
+
+# Safe mode (Docker) settings
+SAFE_MODE=false
+
+INNER_RUN_CLAUDE_FIRST_RUN=true
+inner_run_claude() {
+    init_claude_session
+
+    local user_prompt="$1"
+    local phase="$2"
+    local loop_count="${3:-}"
+    local session_id=$(get_claude_session_id)
+    local session_is_new=""
+
+    if [[ "$INNER_RUN_CLAUDE_FIRST_RUN" == "true" ]]; then
+        # 首次运行，初始化
+        session_is_new=$(get_claude_session_is_new)
+        INNER_RUN_CLAUDE_FIRST_RUN=false
+    else
+        # 后续运行，session已存在
+        session_is_new="false"
+    fi
+
+    run_claude "user_prompt" "$user_prompt" \
+        "phase" "$phase" \
+        "session_is_new" "$session_is_new" \
+        "session_id" "$session_id" \
+        "save_mode" "$SAFE_MODE" \
+        "loop_count" "$loop_count"
+    local claude_exit_code=$?
+    if [[ $claude_exit_code -eq 0 ]]; then
+        return 0
+    fi
+
+    log "ERROR" "[$phase] Claude failed, exit code $claude_exit_code"
+    exit $claude_exit_code
+}
+
+#==============================================================================
+# PROMPTS - Defined early so both task mode and main loop can use them
+#==============================================================================
+
+PLAN_PROMPT=$(get_plan_prompt)
+EXECUTE_PROMPT=$(get_execute_prompt)
+REVIEW_PROMPT=$(get_review_prompt)
+FIX_PROMPT=$(get_fix_prompt)
+
+
+#==============================================================================
+# GIT/GH DETECTION FUNCTIONS (for task command)
+#==============================================================================
+
+# Detect if git is available and we're in a repo
+detect_git() {
+    if command -v git &>/dev/null && git rev-parse --git-dir &>/dev/null 2>&1; then
+        echo "1"
+    else
+        echo "0"
+    fi
+}
+
+# Detect if gh CLI is available and authenticated
+detect_gh() {
+    if command -v gh &>/dev/null && gh auth status &>/dev/null 2>&1; then
+        echo "1"
+    else
+        echo "0"
+    fi
+}
+
+# Generate task ID from description (uses first line only for slug)
+generate_task_id() {
+    local description="$1"
+    local timestamp=$(date +%s)
+    # Use only first non-empty line for slug (handles multi-line markdown)
+    local first_line=$(echo "$description" | grep -v '^#' | grep -v '^$' | head -1)
+    local slug=$(echo "$first_line" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | cut -c1-30)
+    echo "${timestamp}-${slug}"
+}
+
+#==============================================================================
+# REBUILD COMMAND - Force rebuild Docker image
+#==============================================================================
+if [[ "${1:-}" == "--rebuild" ]]; then
+    SAFE_MODE=$(detect_safe_mode)
+
+    if [[ "$SAFE_MODE" != true ]]; then
+        log "ERROR" "Error: Not a safe mode project (no $SAFE_MODE_DOCKERFILE found)"
+        log "ERROR" "Run 'zhiren init --safe <idea.md>' to enable safe mode"
+        exit 1
+    fi
+
+    log "LIGHT" "Rebuilding Docker image..."
+    build_docker_image "true"
+    exit 0
+fi
+
+#==============================================================================
+# REFRESH COMMAND - Add tasks from freeform notes
+#==============================================================================
+if [[ "${1:-}" == "refresh" ]]; then
+    NOTES_FILE="$2"
+
+    if [[ -z "$NOTES_FILE" ]]; then
+        log "ERROR" "Usage: zhiren refresh <notes.md>"
+        exit 1
+    fi
+
+    if [[ ! -f "$NOTES_FILE" ]]; then
+        log "ERROR" "Error: $NOTES_FILE not found"
+        exit 1
+    fi
+
+    if [[ ! -f "$CONTEXT_FILE" ]]; then
+        log "ERROR" "Error: $CONTEXT_FILE not found - run 'zhiren init' first"
+        exit 1
+    fi
+
+    if [[ ! -f "$TASK_FILE" ]]; then
+        log "ERROR" "Error: $TASK_FILE not found - run 'zhiren init' first"
+        exit 1
+    fi
+
+    log "LIGHT" "Zhiren refreshing project from: $NOTES_FILE"
+
+    REFRESH_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_refresh.md")
+
+    NOTES_CONTENT=$(cat "$NOTES_FILE")
+    CONTEXT_CONTENT=$(cat "$CONTEXT_FILE")
+    TASKS_CONTENT=$(cat "$TASK_FILE")
+
+    # Read CLAUDE.md if exists
+    CLAUDE_MD=""
+    if [[ -f "CLAUDE.md" ]]; then
+        CLAUDE_MD="
+## Project Rules (from CLAUDE.md):
+$(cat CLAUDE.md)
+"
+    fi
+
+    inner_run_claude "# USER'S NOTES:
+
+$NOTES_CONTENT
+
+---
+
+## CURRENT CONTEXT.md:
+$CONTEXT_CONTENT
+
+---
+
+## CURRENT TASKS.md:
+$TASKS_CONTENT
+
+$CLAUDE_MD
+---
+
+$REFRESH_PROMPT" "REFRESH"
+
+    # Show result
+    NEW_TASKS=$(grep -c '^\s*- \[ \]' "$TASK_FILE" 2>/dev/null || echo "0")
+    log "SUCCESS" "Project refreshed!"
+    log "INFO" "  - $NEW_TASKS pending tasks in $TASK_FILE"
+    log "INFO" ""
+    log "LIGHT" "Run 'zhiren' to work through the new tasks"
+
+    exit 0
+fi
+
+#==============================================================================
+# TASK COMMAND - Isolated single-task mode
+#==============================================================================
+if [[ "${1:-}" == "task" ]]; then
+    shift  # Remove "task" from args
+
+    # Parse task command arguments
+    TASK_SAFE_MODE=false
+    TASK_DESCRIPTION=""
+    TASK_NO_PR=false
+    TASK_NO_WORKTREE=false
+    TASK_MAX_ITERATIONS=25
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --safe)
+                TASK_SAFE_MODE=true
+                shift
+                ;;
+            --no-pr)
+                TASK_NO_PR=true
+                shift
+                ;;
+            --no-worktree)
+                TASK_NO_WORKTREE=true
+                shift
+                ;;
+            -n)
+                TASK_MAX_ITERATIONS="$2"
+                shift 2
+                ;;
+            *)
+                # Assume it's the task description (or file path)
+                TASK_DESCRIPTION="$1"
+                shift
+                ;;
+        esac
+    done
+
+    # Auto-detect: if description is an existing file, read it
+    if [[ -n "$TASK_DESCRIPTION" ]] && [[ -f "$TASK_DESCRIPTION" ]]; then
+        TASK_DESCRIPTION=$(cat "$TASK_DESCRIPTION")
+    fi
+
+    if [[ -z "$TASK_DESCRIPTION" ]]; then
+        log "ERROR" "Usage: zhiren task [--safe] [--no-pr] [--no-worktree] [-n iterations] <description or file.md>"
+        log "INFO" ""
+        log "INFO" "Examples:"
+        log "INFO" "  zhiren task \"Fix the login button not responding\""
+        log "INFO" "  zhiren task bugfix.md                      # reads file as task"
+        log "INFO" "  zhiren task --safe \"Add payment integration\""
+        log "INFO" "  zhiren task --no-worktree \"Quick fix\"     # work in current checkout (affects other sessions)"
+        exit 1
+    fi
+
+    # Detect git and gh availability
+    HAS_GIT=$(detect_git)
+    HAS_GH=$(detect_gh)
+
+    # Generate task ID and paths (use absolute paths to survive worktree cd)
+    TASK_ID=$(generate_task_id "$TASK_DESCRIPTION")
+    TASK_DIR="$ZHIREN_PROJECT_ROOT/.zhiren/tasks/$TASK_ID"
+    TASK_LOG_DIR="$TASK_DIR/logs"
+    TASK_LOG_FILE="$TASK_LOG_DIR/task.log"
+    TASK_SUBTASKS="$TASK_DIR/SUBTASKS.md"
+    TASK_STATE_FILE="$TASK_DIR/.task"
+    TASK_SUMMARY_FILE="$TASK_DIR/summary.md"
+    TASK_ORIGINAL_FILE="$TASK_DIR/TASK.md"
+
+    # Create task directory structure
+    mkdir -p "$TASK_LOG_DIR"
+    echo "$TASK_DESCRIPTION" > "$TASK_ORIGINAL_FILE"
+
+    echo -e "${CYAN}Zhiren task mode${LOG_COLOR_NC}"
+    echo -e "  Task ID: $TASK_ID"
+    echo -e "  Task dir: $TASK_DIR"
+    echo -e "  Git available: $([ \"$HAS_GIT\" == \"1\" ] && echo \"yes\" || echo \"no\")"
+    echo -e "  GitHub CLI: $([ \"$HAS_GH\" == \"1\" ] && echo \"yes\" || echo \"no\")"
+
+    # Task-specific log function
+    task_log() {
+        local level="$1"
+        local msg="$2"
+        local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+        echo "[$timestamp] [$level] $msg" >> "$TASK_LOG_FILE"
+    }
+
+    task_log "INFO" "=== Task session started ==="
+    task_log "INFO" "Task: $TASK_DESCRIPTION"
+    task_log "INFO" "Task ID: $TASK_ID"
+
+    # Track original branch if git available
+    ORIGINAL_BRANCH=""
+    ORIGINAL_DIR=$(pwd)
+    WORKTREE_PATH=""
+    WORKTREE_BRANCH=""
+
+    if [[ "$HAS_GIT" == "1" ]]; then
+        ORIGINAL_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        task_log "INFO" "Starting branch: $ORIGINAL_BRANCH"
+
+        # Create isolated worktree unless --no-worktree flag is set
+        if [[ "$TASK_NO_WORKTREE" != true ]]; then
+            # Generate branch name from task description using Claude (with fallback)
+            branch_slug=""
+            if command -v claude &>/dev/null; then
+                branch_slug=$(echo "$TASK_DESCRIPTION" | head -100 | claude -p "Generate a concise git branch name for this task. Rules: max 40 chars, lowercase, hyphens only, no leading/trailing hyphens, descriptive of the work. Output ONLY the branch name, nothing else." 2>/dev/null | tr -d '[:space:]' | head -c 40)
+            fi
+            # Fallback to simple slug if Claude fails or unavailable
+            if [[ -z "$branch_slug" ]]; then
+                first_line=$(echo "$TASK_DESCRIPTION" | grep -v '^#' | grep -v '^>' | grep -v '^$' | head -1)
+                branch_slug=$(echo "$first_line" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//' | sed 's/-$//' | cut -c1-40)
+            fi
+            WORKTREE_BRANCH="feature/${branch_slug}"
+            WORKTREE_PATH="/tmp/zhiren-worktree-$TASK_ID"
+
+            echo -e "${CYAN}Creating isolated worktree...${LOG_COLOR_NC}"
+            task_log "INFO" "Creating worktree at $WORKTREE_PATH on branch $WORKTREE_BRANCH"
+
+            # Create worktree with new branch
+            if ! git worktree add "$WORKTREE_PATH" -b "$WORKTREE_BRANCH" 2>/dev/null; then
+                # Branch might already exist, try without -b
+                if ! git worktree add "$WORKTREE_PATH" "$WORKTREE_BRANCH" 2>/dev/null; then
+                    echo -e "${RED}Failed to create worktree - falling back to current checkout${LOG_COLOR_NC}"
+                    task_log "WARN" "Worktree creation failed, using current checkout"
+                    WORKTREE_PATH=""
+                    WORKTREE_BRANCH=""
+                fi
+            fi
+
+            if [[ -n "$WORKTREE_PATH" ]] && [[ -d "$WORKTREE_PATH" ]]; then
+                echo -e "${GREEN}Working in isolated worktree: $WORKTREE_PATH${LOG_COLOR_NC}"
+                echo -e "${GREEN}Branch: $WORKTREE_BRANCH${LOG_COLOR_NC}"
+                task_log "INFO" "Worktree created successfully"
+
+                # Change to worktree directory
+                cd "$WORKTREE_PATH"
+
+                # Update task directory paths to be absolute (so they work from worktree)
+                TASK_DIR="$ORIGINAL_DIR/.zhiren/tasks/$TASK_ID"
+                TASK_LOG_DIR="$TASK_DIR/logs"
+                TASK_LOG_FILE="$TASK_LOG_DIR/task.log"
+                TASK_SUBTASKS="$TASK_DIR/SUBTASKS.md"
+                TASK_STATE_FILE="$TASK_DIR/.task"
+                TASK_SUMMARY_FILE="$TASK_DIR/summary.md"
+                TASK_ORIGINAL_FILE="$TASK_DIR/TASK.md"
+            fi
+        fi
+    fi
+
+    # Cleanup function for worktree
+    cleanup_worktree() {
+        if [[ -n "$WORKTREE_PATH" ]] && [[ -d "$WORKTREE_PATH" ]]; then
+            task_log "INFO" "Cleaning up worktree at $WORKTREE_PATH"
+            cd "$ORIGINAL_DIR"
+            git worktree remove "$WORKTREE_PATH" --force 2>/dev/null || true
+        fi
+    }
+
+    # Trap to cleanup on exit/interrupt
+    trap cleanup_worktree EXIT
+
+    # Handle safe mode for task
+    if [[ "$TASK_SAFE_MODE" == true ]]; then
+        if [[ ! -f "$SAFE_MODE_DOCKERFILE" ]]; then
+            echo -e "${CYAN}Generating Docker configuration for safe mode...${LOG_COLOR_NC}"
+            generate_dockerfile
+        fi
+        SAFE_MODE=true
+        build_docker_image "false"
+    fi
+
+    echo ""
+
+    # Read project context if available (read-only)
+    PROJECT_CONTEXT=""
+    if [[ -f "$CONTEXT_FILE" ]]; then
+        PROJECT_CONTEXT="## PROJECT CONTEXT (from CONTEXT.md):
+$(cat "$CONTEXT_FILE")
+
+"
+    fi
+
+    # Read specs if available (read-only)
+    SPECS_CONTENT=""
+    if [[ -d "$SPECS_DIR" ]]; then
+        SPECS_FILES=$(find "$SPECS_DIR" -name "*.md" 2>/dev/null)
+        if [[ -n "$SPECS_FILES" ]]; then
+            SPECS_CONTENT="## SPECIFICATIONS (from specs/):
+$(cat $SPECS_DIR/*.md 2>/dev/null)
+
+"
+        fi
+    fi
+
+    # Read CLAUDE.md if exists
+    CLAUDE_MD_CONTENT=""
+    if [[ -f "CLAUDE.md" ]]; then
+        CLAUDE_MD_CONTENT="## Project Rules (from CLAUDE.md):
+$(cat CLAUDE.md)
+
+"
+    fi
+
+    #--------------------------------------------------------------------------
+    # DECOMPOSE PHASE - Break task into subtasks
+    #--------------------------------------------------------------------------
+    echo -e "${BLUE}[DECOMPOSE]${LOG_COLOR_NC} Breaking down task..."
+    task_log "INFO" "[DECOMPOSE] Starting..."
+
+    # Build git workflow instructions based on worktree status
+    if [[ -n "$WORKTREE_PATH" ]]; then
+        GIT_WORKFLOW_INSTRUCTIONS="## Git Workflow
+**You are working in an ISOLATED GIT WORKTREE on branch: $WORKTREE_BRANCH**
+- Do NOT create a branch subtask - you're already on the feature branch
+- Do NOT run git checkout or git switch - stay on current branch
+- Just commit your changes during EXECUTE phase
+- PR creation happens at the end (handled by zhiren)
+"
+        GIT_EXAMPLE="- [ ] Add onClick handler to login button → Button calls handleLogin function when clicked"
+    else
+        GIT_WORKFLOW_INSTRUCTIONS="## Git Workflow (if git available)
+1. **First subtask should create a feature branch** (unless task specifies otherwise)
+   - Use branch name from task description if provided
+   - Otherwise use a descriptive name like \`feature/short-description\` or \`fix/short-description\`
+2. Commits happen during EXECUTE phase
+3. PR creation happens at the end (handled by zhiren)
+
+If the task description includes specific git instructions (branch name, workflow), follow those.
+"
+        GIT_EXAMPLE="- [ ] Create feature branch \`feature/login-fix\` → Branch exists and is checked out
+- [ ] Add onClick handler to login button → Button calls handleLogin function when clicked"
+    fi
+
+    DECOMPOSE_PROMPT_BASE=$(cat "${SCRIPT_DIR}/resources/prompt_decompose_task.md")
+    DECOMPOSE_FULL_PROMPT="# TASK TO DECOMPOSE:
+$TASK_DESCRIPTION
+
+---
+
+$PROJECT_CONTEXT$SPECS_CONTENT$CLAUDE_MD_CONTENT
+$GIT_WORKFLOW_INSTRUCTIONS
+
+## Examples
+$GIT_EXAMPLE
+- [ ] Test login flow → Clicking login button redirects to /dashboard
+
+---
+
+Write subtasks to: $TASK_SUBTASKS
+
+$DECOMPOSE_PROMPT_BASE"
+
+    if ! inner_run_claude "$DECOMPOSE_FULL_PROMPT" "DECOMPOSE"; then
+        echo -e "${RED}Decompose phase failed - aborting${LOG_COLOR_NC}"
+        task_log "ERROR" "[DECOMPOSE] Failed - aborting"
+        # EXIT trap handles worktree cleanup
+        exit 1
+    fi
+
+    # Verify SUBTASKS.md was created
+    if [[ ! -f "$TASK_SUBTASKS" ]]; then
+        echo -e "${RED}Error: SUBTASKS.md not created${LOG_COLOR_NC}"
+        task_log "ERROR" "[DECOMPOSE] No SUBTASKS.md created"
+        # EXIT trap handles worktree cleanup
+        exit 1
+    fi
+
+    SUBTASK_COUNT=$(grep -c '^\s*- \[ \]' "$TASK_SUBTASKS" 2>/dev/null || echo "0")
+    echo -e "${GREEN}Created $SUBTASK_COUNT subtasks${LOG_COLOR_NC}"
+    task_log "INFO" "[DECOMPOSE] Created $SUBTASK_COUNT subtasks"
+    echo ""
+
+    #--------------------------------------------------------------------------
+    # TASK LOOP - Run until all subtasks complete
+    # Uses main prompts with task-mode context injection
+    #--------------------------------------------------------------------------
+
+    # Build worktree context if in a worktree
+    WORKTREE_CONTEXT=""
+    if [[ -n "$WORKTREE_PATH" ]]; then
+        WORKTREE_CONTEXT="
+**GIT WORKTREE ISOLATION:**
+- You are working in an ISOLATED worktree at: $WORKTREE_PATH
+- Current branch: $WORKTREE_BRANCH
+- Do NOT run \`git checkout\` or \`git switch\` - stay on current branch
+- Just make commits - zhiren handles branch management
+"
+    fi
+
+    # Build task mode context header (injected before each prompt)
+    TASK_MODE_HEADER="## TASK MODE - Isolated Fix
+$WORKTREE_CONTEXT
+**File Mappings (read these instead of defaults):**
+- TASKS.md → $TASK_SUBTASKS
+- .task → $TASK_STATE_FILE
+
+**Task Mode Rules:**
+- You are fixing a specific thing in an EXISTING project
+- Do NOT delete any project source files - only modify what's needed
+- Do NOT create new test infrastructure if none exists
+- If tests exist and this change naturally fits, add/update tests
+- If no tests exist, outcome verification (grep, curl, file check) is sufficient
+
+**IMPORTANT - Batch Related Tasks:**
+Instead of picking only the FIRST unchecked task, you should:
+1. Look at ALL unchecked tasks in the subtasks file
+2. Identify a logical GROUP of related/coupled tasks (e.g., all methods in one class, all changes to one file, all tightly coupled changes)
+3. Plan and execute them TOGETHER in one iteration
+4. This reduces redundant exploration and keeps related changes atomic
+
+Write to .task file with format:
+\`\`\`
+TASKS: [list the related tasks you're tackling together]
+EXPECTED_OUTCOMES:
+- [outcome for task 1]
+- [outcome for task 2]
+...rest of plan format...
+\`\`\`
+
+**REVIEW phase**: Verify ALL outcomes for the batched tasks, review ALL code changes together.
+**FIX phase**: Fix issues across ALL changes from the batch.
+**When done**: Mark ALL completed tasks with [x] in the subtasks file.
+
+"
+
+    echo -e "${CYAN}Starting task loop - max $TASK_MAX_ITERATIONS iterations${LOG_COLOR_NC}"
+    echo ""
+
+    for i in $(seq 1 $TASK_MAX_ITERATIONS); do
+        # Check for remaining subtasks
+        if ! grep -q '^\s*- \[ \]' "$TASK_SUBTASKS"; then
+            echo -e "${GREEN}All subtasks complete!${LOG_COLOR_NC}"
+            task_log "INFO" "All subtasks complete"
+            break
+        fi
+
+        REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_SUBTASKS") || REMAINING=0
+        echo -e "${YELLOW}=== Task iteration $i/$TASK_MAX_ITERATIONS ($REMAINING subtasks remaining) ===${LOG_COLOR_NC}"
+        task_log "INFO" "=== Iteration $i/$TASK_MAX_ITERATIONS ($REMAINING remaining) ==="
+
+        # Build context for this iteration (task mode header + project context)
+        ITER_CONTEXT="$TASK_MODE_HEADER$PROJECT_CONTEXT$SPECS_CONTENT$CLAUDE_MD_CONTENT"
+
+        # PLAN (uses main PLAN_PROMPT with task context)
+        echo -e "${BLUE}[1/4 PLAN]${LOG_COLOR_NC} Analyzing subtask..."
+        task_log "INFO" "[PLAN] Starting..."
+        if ! inner_run_claude "$ITER_CONTEXT
+
+$PLAN_PROMPT" "TASK_PLAN"; then
+            echo -e "${RED}Plan phase failed - aborting${LOG_COLOR_NC}"
+            task_log "ERROR" "[PLAN] Failed - aborting"
+            break
+        fi
+
+        if [[ ! -f "$TASK_STATE_FILE" ]]; then
+            echo -e "${RED}Plan failed - no .task file created${LOG_COLOR_NC}"
+            task_log "ERROR" "[PLAN] No .task file created"
+            continue
+        fi
+
+        # Log which tasks are being worked on
+        CURRENT_TASKS=$(grep -E '^TASK:|^TASKS:' "$TASK_STATE_FILE" 2>/dev/null | head -3)
+        task_log "INFO" "[PLAN] Working on: $CURRENT_TASKS"
+
+        # EXECUTE (uses main EXECUTE_PROMPT with task context)
+        echo -e "${BLUE}[2/4 EXECUTE]${LOG_COLOR_NC} Implementing..."
+        task_log "INFO" "[EXECUTE] Starting..."
+        if ! inner_run_claude "$ITER_CONTEXT
+
+$EXECUTE_PROMPT" "TASK_EXECUTE"; then
+            echo -e "${RED}Execute phase failed - aborting${LOG_COLOR_NC}"
+            task_log "ERROR" "[EXECUTE] Failed - aborting"
+            break
+        fi
+        task_log "INFO" "[EXECUTE] Complete"
+
+        # REVIEW (uses main REVIEW_PROMPT with task context)
+        echo -e "${BLUE}[3/4 REVIEW]${LOG_COLOR_NC} Reviewing..."
+        task_log "INFO" "[REVIEW] Starting..."
+        if ! inner_run_claude "$ITER_CONTEXT
+
+$REVIEW_PROMPT" "TASK_REVIEW"; then
+            echo -e "${RED}Review phase failed - aborting${LOG_COLOR_NC}"
+            task_log "ERROR" "[REVIEW] Failed - aborting"
+            break
+        fi
+        task_log "INFO" "[REVIEW] Complete"
+
+        # FIX (uses main FIX_PROMPT with task context)
+        echo -e "${BLUE}[4/4 FIX]${LOG_COLOR_NC} Fixing..."
+        task_log "INFO" "[FIX] Starting..."
+        if ! inner_run_claude "$ITER_CONTEXT
+
+$FIX_PROMPT" "TASK_FIX"; then
+            echo -e "${RED}Fix phase failed - aborting${LOG_COLOR_NC}"
+            task_log "ERROR" "[FIX] Failed - aborting"
+            break
+        fi
+        task_log "INFO" "[FIX] Complete"
+
+        # Log completed count
+        COMPLETED_NOW=$(grep -c '^\s*- \[x\]' "$TASK_SUBTASKS" 2>/dev/null) || COMPLETED_NOW=0
+        task_log "INFO" "Iteration $i complete - $COMPLETED_NOW subtasks done so far"
+
+        sleep 2
+    done
+
+    #--------------------------------------------------------------------------
+    # FINALIZE - Push, create PR, generate summary (Claude handles git workflow)
+    #--------------------------------------------------------------------------
+    echo ""
+    echo -e "${CYAN}[FINALIZE]${LOG_COLOR_NC} Wrapping up task..."
+    task_log "INFO" "[FINALIZE] Starting..."
+
+    # Build finalize prompt - different based on worktree mode
+    if [[ -n "$WORKTREE_PATH" ]]; then
+        FINALIZE_PROMPT=$(get_finalize_prompt "$WORKTREE_PATH")
+    else
+        FINALIZE_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_finalize.md")
+    fi
+
+    # Add no-pr constraint if flag set
+    if [[ "$TASK_NO_PR" == true ]]; then
+        FINALIZE_PROMPT+="
+- Do NOT create a pull request (--no-pr flag was set)"
+    fi
+
+    # Add context about original branch
+    FINALIZE_PROMPT+="
+- Original branch was: $ORIGINAL_BRANCH
+- Subtasks file: $TASK_SUBTASKS
+
+## Subtasks Status
+$(cat "$TASK_SUBTASKS" 2>/dev/null || echo "No subtasks file found")
+"
+
+    # Run finalize phase
+    if ! inner_run_claude "$FINALIZE_PROMPT" "FINALIZE"; then
+        echo -e "${YELLOW}Finalize phase had issues - check output above${LOG_COLOR_NC}"
+        task_log "WARN" "[FINALIZE] Had issues"
+    else
+        task_log "INFO" "[FINALIZE] Complete"
+    fi
+
+    # Return to original branch (safety fallback in case Claude didn't)
+    # Skip if in worktree - the EXIT trap handles cleanup
+    if [[ "$HAS_GIT" == "1" ]] && [[ -z "$WORKTREE_PATH" ]]; then
+        CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+        if [[ "$CURRENT_BRANCH" != "$ORIGINAL_BRANCH" ]]; then
+            git checkout "$ORIGINAL_BRANCH" 2>/dev/null
+        fi
+    fi
+
+    # Log final stats
+    FINAL_COMPLETED=$(grep -c '^\s*- \[x\]' "$TASK_SUBTASKS" 2>/dev/null) || FINAL_COMPLETED=0
+    FINAL_REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_SUBTASKS" 2>/dev/null) || FINAL_REMAINING=0
+    task_log "INFO" "=== TASK FINISHED: $FINAL_COMPLETED completed, $FINAL_REMAINING remaining ==="
+
+    # Output completion
+    echo ""
+    echo -e "${GREEN}========================================${LOG_COLOR_NC}"
+    echo -e "${GREEN}TASK COMPLETE${LOG_COLOR_NC}"
+    echo -e "${GREEN}========================================${LOG_COLOR_NC}"
+
+    # Cleanup task state directory
+    echo -e "\n${CYAN}Cleaning up task state...${LOG_COLOR_NC}"
+    rm -rf "$TASK_DIR"
+    log "SUCCESS" "Done"
+    exit 0
+fi
+
+# Only execute when run directly, not when sourced
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    log "ERROR" "Error: zhiren script should be run directly, not sourced"
+    exit 1
+fi
+
+#==============================================================================
+# MAIN LOOP - PLAN → EXECUTE → REVIEW → FIX
+#==============================================================================
+
+# Parse main loop arguments
+MAX_ITERATIONS=
+BATCH_MODE=false
+BATCH_SIZE=5
+
+while [[ $# -gt 0 ]]; do
+    case "${1:-}" in
+        --batch=*)
+            # --batch=N syntax: batch mode with custom size
+            BATCH_MODE=true
+            BATCH_SIZE="${1#--batch=}"
+            shift
+            ;;
+        --batch)
+            # --batch alone: batch mode with default size
+            BATCH_MODE=true
+            shift
+            ;;
+        -b=*)
+            # -b=N syntax: batch mode with custom size
+            BATCH_MODE=true
+            BATCH_SIZE="${1#-b=}"
+            shift
+            ;;
+        -b[0-9]*)
+            # -bN syntax (no space): batch mode with custom size
+            BATCH_MODE=true
+            BATCH_SIZE="${1#-b}"
+            shift
+            ;;
+        -b)
+            # -b alone: batch mode with default size
+            BATCH_MODE=true
+            shift
+            ;;
+        [0-9]*)
+            MAX_ITERATIONS="$1"
+            shift
+            ;;
+        *)
+            log "ERROR" "Unknown option: $1"
+            log "INFO" "Usage: zhiren [options] [iterations]"
+            log "INFO" "Options:"
+            log "INFO" "  --batch       Enable batch mode (up to 5 related tasks)"
+            log "INFO" "  --batch=N     Enable batch mode with custom size"
+            log "INFO" "  -b, -bN       Short form of --batch, --batch=N"
+            exit 1
+            ;;
+    esac
+done
+
+# Check required files
+if [[ ! -f "$TASK_FILE" ]]; then
+    log "ERROR" "Error: $TASK_FILE not found"
+    log "INFO" "Run 'zhiren init <idea.md>' first"
+    exit 1
+fi
+
+# Determine max iterations if not set
+if [ -z "$MAX_ITERATIONS" ]; then
+    # 根据任务数量动态设置最大迭代次数
+    REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" || echo "0")
+    if [ "$REMAINING" -eq 0 ]; then
+        MAX_ITERATIONS=1
+        # 循环里面还会判断剩余任务，这里设置1保证能进入循环一次以打印完成信息
+        log "WARN" "No remaining tasks - setting MAX_ITERATIONS to $MAX_ITERATIONS"
+    else
+        MAX_ITERATIONS=$((REMAINING * 2))
+        log "LIGHT" "MAX_ITERATIONS not set - defaulting to $MAX_ITERATIONS (2x remaining tasks: $REMAINING)"
+    fi
+fi
+
+if [[ ! -f "$CONTEXT_FILE" ]]; then
+    log "WARNING" "Warning: $CONTEXT_FILE not found"
+fi
+
+# Main mode testing guidance (injected into context)
+MAIN_MODE_HEADER="## DEVELOPMENT MODE - Testing Requirements
+
+**Testing is CRITICAL for the feedback loop:**
+- If no tests exist yet → flag as 🟡 ISSUE: \"No tests - add test for this feature\"
+- If tests exist but don't cover new code → flag as 🟡 ISSUE: \"Add test coverage\"
+- Tests let you VERIFY the implementation works - without them you're blind
+- A feature without tests is not truly complete
+
+"
+
+# Load context fresh each iteration
+load_context() {
+    CONTEXT="$MAIN_MODE_HEADER"
+    if [[ -f "$CONTEXT_FILE" ]]; then
+        CONTEXT+=$(cat "$CONTEXT_FILE")
+    fi
+    # Also include CLAUDE.md if exists (project rules)
+    if [[ -f "CLAUDE.md" ]]; then
+        CONTEXT="$CONTEXT
+
+## Project Rules (from CLAUDE.md):
+$(cat CLAUDE.md)"
+    fi
+}
+
+# Detect and setup safe mode if applicable
+SAFE_MODE=$(detect_safe_mode)
+if [[ "$SAFE_MODE" == true ]]; then
+    log "LIGHT" "Safe mode detected (.zhiren/Dockerfile found)"
+    build_docker_image "false"
+    echo ""
+fi
+
+# Start main loop
+main_loop() {
+    # Log session start
+    log "INFO" "=== Zhiren session started ==="
+    log "INFO" "Max iterations: $MAX_ITERATIONS, Safe mode: $SAFE_MODE, Batch mode: $BATCH_MODE (size: $BATCH_SIZE)"
+    log "INFO" "Working directory: $(pwd)"
+
+    log "LIGHT" "Zhiren starting - max $MAX_ITERATIONS iterations"
+    if [[ "$BATCH_MODE" == true ]]; then
+        log "LIGHT" "Batch mode: up to $BATCH_SIZE related tasks per iteration"
+    fi
+    log "LIGHT" "Loop: PLAN → EXECUTE → REVIEW → FIX"
+    log "INFO" "Logs: $LOG_FILE"
+    log "INFO" ""
+
+    for i in $(seq 1 $MAX_ITERATIONS); do
+        # Load context fresh each iteration
+        load_context
+
+        # Check for remaining tasks
+        if ! grep -q '^\s*- \[ \]' "$TASK_FILE"; then
+            log "SUCCESS" "All tasks complete!"
+            rm -f "$TASK_STATE"
+            exit 0
+        fi
+
+        REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" || echo "0")
+        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING tasks remaining) ==="
+
+        # Select prompts based on batch mode
+        if [[ "$BATCH_MODE" == true ]]; then
+            ACTIVE_PLAN_PROMPT=$(get_batch_plan_prompt "$BATCH_SIZE")
+            ACTIVE_EXECUTE_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_execute.md")
+            ACTIVE_REVIEW_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_review.md")
+            ACTIVE_FIX_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_fix.md")
+        else
+            ACTIVE_PLAN_PROMPT="$PLAN_PROMPT"
+            ACTIVE_EXECUTE_PROMPT="$EXECUTE_PROMPT"
+            ACTIVE_REVIEW_PROMPT="$REVIEW_PROMPT"
+            ACTIVE_FIX_PROMPT="$FIX_PROMPT"
+        fi
+
+        # PLAN
+        log "LIGHT3" "[1/4 PLAN] Analyzing..."
+        if ! inner_run_claude "$CONTEXT
+
+$ACTIVE_PLAN_PROMPT" "PLAN" "$i"; then
+            log "ERROR" "Plan phase failed after $MAX_RETRIES retries - aborting"
+            exit 1
+        fi
+
+        if [[ ! -f "$TASK_STATE" ]]; then
+            log "ERROR" "Plan failed - no .task file"
+            continue
+        fi
+
+        # EXECUTE
+        log "LIGHT3" "[2/4 EXECUTE] Implementing..."
+        if ! inner_run_claude "$CONTEXT
+
+$ACTIVE_EXECUTE_PROMPT" "EXECUTE" "$i"; then
+            log "ERROR" "Execute phase failed after $MAX_RETRIES retries - aborting"
+            exit 1
+        fi
+
+        # REVIEW
+        log "LIGHT3" "[3/4 REVIEW] Reviewing..."
+        if ! inner_run_claude "$CONTEXT
+
+$ACTIVE_REVIEW_PROMPT" "REVIEW" "$i"; then
+            log "ERROR" "Review phase failed after $MAX_RETRIES retries - aborting"
+            exit 1
+        fi
+
+        # FIX
+        log "LIGHT3" "[4/4 FIX] Fixing..."
+        if ! inner_run_claude "$CONTEXT
+
+$ACTIVE_FIX_PROMPT" "FIX" "$i"; then
+            log "ERROR" "Fix phase failed after $MAX_RETRIES retries - aborting"
+            exit 1
+        fi
+
+        sleep 2
+    done
+
+    log "LIGHT" "Max iterations reached ($MAX_ITERATIONS) - exiting main loop"
+}
+
+main_loop
