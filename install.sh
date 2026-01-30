@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eu
 
 log() {
     local msg="$1"
@@ -68,6 +68,7 @@ copy_to_home() {
     # 复制可执行脚本
     cp "$SCRIPT_DIR/zhiren" "$ZHIREN_HOME/"
     cp "$SCRIPT_DIR/zhiren_init" "$ZHIREN_HOME/"
+    cp "$SCRIPT_DIR/zhiren_clean_project" "$ZHIREN_HOME/"
 
     # 复制 lib 目录（保留结构）
     cp -r "$SCRIPT_DIR/lib" "$ZHIREN_HOME/"
@@ -82,13 +83,14 @@ inner_install() {
     local installed_command="$1"
     local target_command="$2"
 
-    cat > "$ZHIREN_BIN_DIR/$installed_command" << 'EOF'
+    cat > "$ZHIREN_BIN_DIR/$installed_command" << EOF
 #!/bin/bash
 
-ZHIREN_HOME="$HOME/.zhiren"
+ZHIREN_HOME="\$HOME/.zhiren"
 
-exec "$ZHIREN_HOME/$target_command" "$@"
+exec "\$ZHIREN_HOME/$target_command" "\$@"
 EOF
+
     chmod a+x "$ZHIREN_BIN_DIR/$installed_command"
     log "Installed $installed_command command to $ZHIREN_BIN_DIR/$installed_command"
 }
@@ -105,7 +107,7 @@ install() {
     inner_install "zhiren-init" "zhiren_init"
 
     # Create zhiren-clean-project command
-    inner_install "zhiren-clean-project-init" "zhiren_clean_project"
+    inner_install "zhiren-clean-project" "zhiren_clean_project"
 
     log ""
 }
