@@ -1,0 +1,164 @@
+#!/bin/bash
+
+# -e: 命令失败时立即退出
+# -u: 使用未定义变量时报错
+set -euo pipefail
+
+SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+
+dir_detect() {
+    local log_color_red="\033[0;31m"
+    local nc="\033[0m"
+    # 检查当前目录下是否存在 .zhiren 文件夹
+    if [[ ! -d ".zhiren" || ! -d "specs" || ! -f "TASKS.md" || ! -f "CONTEXT.md" ]]; then
+        echo -e "${log_color_red}必须要同时有 .zhiren、specs、TASKS.md、CONTEXT.md，这些目录或文件表明此处使用了 zhiren AI 工具。清理其他目录属非法操作。${nc}"
+        exit 1
+    fi
+}
+dir_detect
+
+# Source library components
+source "$SCRIPT_DIR/lib/tools.sh"
+source "$SCRIPT_DIR/lib/consts.sh"
+source "$SCRIPT_DIR/lib/log.sh"
+
+usage() {
+    cat <<EOF
+用法: $0 [选项] <目标目录>
+
+选项:
+  -k, --keep ITEM      指定要保留的文件或目录（可多次使用）
+  --all                显式表示清理所有内容（不保留任何东西）
+  -h, --help           显示此帮助信息
+
+注意：
+  - 必须显式指定 --all 或至少一个 --keep，否则脚本拒绝运行。
+  - 目标目录本身不会被删除，只清理其内容。
+EOF
+}
+
+# 初始化变量
+declare -a KEEP_ITEMS=()
+CLEAN_ALL=false
+CONFIRM_TO_YES=false
+TARGET_DIR=$(pwd)
+
+# 解析参数（兼容 bash-3.2，不使用 getopts 长选项）
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -k|--keep)
+            if [ -z "$2" ]; then
+                echo "错误: '$1' 需要一个参数" >&2
+                exit 1
+            fi
+            KEEP_ITEMS+=("$2")
+            shift 2
+            ;;
+        -a|--all)
+            CLEAN_ALL=true
+            shift
+            ;;
+        -y|--yes)
+            CONFIRM_TO_YES=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*|*)
+            log "ERROR" "未知选项: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
+log "INFO" "🚀 开始清理当前目录"
+log "INFO" ""
+
+# 检查参数逻辑：必须显式指定 --all 或至少一个 --keep
+if [ "$CLEAN_ALL" = false ] && [ ${#KEEP_ITEMS[@]} -eq 0 ]; then
+    log "ERROR" "必须指定 --all（清理全部）或至少一个 --keep（保留项）" >&2
+    exit 1
+fi
+
+# 检查是否指定了目标目录
+if [ -z "$TARGET_DIR" ]; then
+    log "ERROR" "未指定目标目录" >&2
+    usage >&2
+    exit 1
+fi
+
+# 检查目录是否存在
+if [ ! -d "$TARGET_DIR" ]; then
+    log "ERROR" "目标不是有效目录: $TARGET_DIR" >&2
+    exit 1
+fi
+
+# 进入目标目录（避免路径拼接问题）
+cd "$TARGET_DIR"
+
+# 使用 find 命令获取所有非隐藏项
+mapfile -t ALL_ITEMS < <(find . -maxdepth 1 -name "[!.]*" -print 2>/dev/null)
+# 去除开头的 "./"
+ALL_ITEMS=("${ALL_ITEMS[@]#./}")
+
+# 如果目录为空，直接退出
+if [ ${#ALL_ITEMS[@]} -eq 0 ]; then
+    log "SUCCESS" "目录为空，无需清理。"
+    exit 0
+fi
+
+# 构建要删除的列表
+declare -a TO_DELETE=()
+
+for item in "${ALL_ITEMS[@]}"; do
+    should_keep=false
+    for keep in "${KEEP_ITEMS[@]}"; do
+        if [ "$item" = "$keep" ]; then
+            should_keep=true
+            break
+        fi
+    done
+    if [ "$should_keep" = false ]; then
+        TO_DELETE+=("$item")
+    fi
+done
+
+# 如果 --all 模式，TO_DELETE 应等于 ALL_ITEMS
+if [ "$CLEAN_ALL" = true ]; then
+    TO_DELETE=("${ALL_ITEMS[@]}")
+fi
+
+# 如果没有要删除的，提示并退出
+if [ ${#TO_DELETE[@]} -eq 0 ]; then
+    log "SUCCESS" "没有需要清理的内容。"
+    exit 0
+fi
+
+delete_files() {
+    # 使用 rm -rf 删除每个项目
+    for del in "${TO_DELETE[@]}"; do
+        rm -rf -- "$del"
+    done
+    log "SUCCESS" "清理完成。"
+}
+
+if [[ "$CONFIRM_TO_YES" == "true" ]]; then
+    delete_files
+    exit 0
+fi
+
+# 执行删除
+log "INFO" "即将删除以下内容（位于: $TARGET_DIR）:"
+printf '  %s\n' "${TO_DELETE[@]}"
+echo -n "确认删除? (y/N): "
+read -r confirm
+
+if [[ "$confirm" =~ ^[Yy]$ ]]; then
+    delete_files
+else
+    log "WARN" "操作已取消。"
+    exit 0
+fi

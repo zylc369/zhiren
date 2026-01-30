@@ -67,7 +67,15 @@ inner_log() {
 }
 
 log() {
-    inner_log "$1" "$2" "$LOG_FILE"
+    local level="$1"
+    local message="$2"
+    local log_file="${3:-${LOG_FILE}}"
+
+    if [[ "$log_file" == '-' ]]; then
+        log_file=""
+    fi
+
+    inner_log "$1" "$2" "$log_file"
 }
 
 log_ai_param() {
