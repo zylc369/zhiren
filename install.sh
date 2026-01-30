@@ -26,6 +26,41 @@ if [[ ! -f "$SCRIPT_DIR/zhiren" ]] || [[ ! -f "$SCRIPT_DIR/zhiren_init" ]] || \
     exit 1
 fi
 
+CLEAN_INSTALL=false
+
+# 使用说明函数
+usage() {
+    cat << EOF
+用法: $0 [选项]
+
+选项:
+    -c, --clean-install    执行全新安装（清理现有安装）
+    -h, --help             显示此帮助信息
+
+示例:
+    $0                     # 普通安装
+    $0 -c                  # 全新安装
+EOF
+}
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -c|--clean-install)
+            CLEAN_INSTALL=true
+            shift 1
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -*|*)
+            log "ERROR" "未知选项: $1" >&2
+            usage >&2
+            exit 1
+            ;;
+    esac
+done
+
 copy_to_home() {
     # 创建zhiren的目录
     mkdir -p "$ZHIREN_HOME"
@@ -34,14 +69,28 @@ copy_to_home() {
     cp "$SCRIPT_DIR/zhiren" "$ZHIREN_HOME/"
     cp "$SCRIPT_DIR/zhiren_init" "$ZHIREN_HOME/"
 
-    # 复制 lib 和 resources 目录（保留结构）
+    # 复制 lib 目录（保留结构）
     cp -r "$SCRIPT_DIR/lib" "$ZHIREN_HOME/"
     log "Copied lib directory to $ZHIREN_HOME/lib/"
+
+    # 复制 resources 目录（保留结构）
     cp -r "$SCRIPT_DIR/resources" "$ZHIREN_HOME/"
     log "Copied resources directory to $ZHIREN_HOME/resources/"
+}
 
-    # 确保脚本有执行权限
-    # chmod +x "$ZHIREN_HOME/zhiren" "$ZHIREN_HOME/zhiren_init"
+inner_install() {
+    local installed_command="$1"
+    local target_command="$2"
+
+    cat > "$ZHIREN_BIN_DIR/$installed_command" << 'EOF'
+#!/bin/bash
+
+ZHIREN_HOME="$HOME/.zhiren"
+
+exec "$ZHIREN_HOME/$target_command" "$@"
+EOF
+    chmod a+x "$ZHIREN_BIN_DIR/$installed_command"
+    log "Installed $installed_command command to $ZHIREN_BIN_DIR/$installed_command"
 }
 
 install() {
@@ -50,30 +99,22 @@ install() {
     mkdir -p "$ZHIREN_BIN_DIR"
 
     # Create zhiren command
-    cat > "$ZHIREN_BIN_DIR/zhiren" << 'EOF'
-#!/bin/bash
-
-ZHIREN_HOME="$HOME/.zhiren"
-
-exec "$ZHIREN_HOME/zhiren" "$@"
-EOF
-    chmod a+x "$ZHIREN_BIN_DIR/zhiren"
-    log "Installed zhiren command to $ZHIREN_BIN_DIR/zhiren"
+    inner_install "zhiren" "zhiren"
 
     # Create zhiren-init command
-    cat > "$ZHIREN_BIN_DIR/zhiren-init" << 'EOF'
-#!/bin/bash
+    inner_install "zhiren-init" "zhiren_init"
 
-
-ZHIREN_HOME="$HOME/.zhiren"
-
-exec "$ZHIREN_HOME/zhiren_init" "$@"
-EOF
-    chmod a+x "$ZHIREN_BIN_DIR/zhiren-init"
-    log "Installed zhiren-init command to $ZHIREN_BIN_DIR/zhiren-init"
+    # Create zhiren-clean-project command
+    inner_install "zhiren-clean-project-init" "zhiren_clean_project"
 
     log ""
 }
+
+if [[ "$CLEAN_INSTALL" == "true" ]];then
+    log "干净安装，先删除：$ZHIREN_HOME"
+    rm -rf "$ZHIREN_HOME"
+    log ""
+fi
 
 copy_to_home
 install
