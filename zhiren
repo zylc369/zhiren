@@ -134,7 +134,9 @@ SAFE_MODE=false
 
 INNER_RUN_CLAUDE_FIRST_RUN=true
 inner_run_claude() {
+    echo "inner_run_claude 0"
     init_claude_session
+    echo "inner_run_claude 1"
 
     local user_prompt="$1"
     local phase="$2"
@@ -444,8 +446,13 @@ run_step() {
     local purpose="${4:-...}"
     local loop_count="${5:-}"
 
-    log "INFO" "First save the current step:$step_name. File Path:$ZHIREN_CURRENT_STEP_FILE" >&2
-    echo -n "$step_name" > "$ZHIREN_CURRENT_STEP_FILE"
+    log "INFO" "Save the current step:$step_name. File Path:$ZHIREN_CURRENT_STEP_FILE" >&2
+    cat > "$ZHIREN_CURRENT_STEP_FILE" << EOF
+{
+    "step": "$step_name",
+    "state": "Running"
+}
+EOF
 
     log "LIGHT3" "[${step_num}/4 ${step_name}] $purpose"
     if ! inner_run_claude "$use_prompt" "$step_name" "$loop_count"; then
@@ -456,8 +463,14 @@ run_step() {
     # PLAN 步骤的特殊检查
     if [[ "$step_name" == "PLAN" ]]; then
         if [[ ! -f "$TASK_STATE" ]]; then
-            log "ERROR" "PLAN STEP failed: No .task file found. Continuing with PLAN STEP." >&2
-            echo "TASK_NOT_GENERATED"
+            log "ERROR" "PLAN STEP failed: No .task file found. Continuing with PLAN STEP."
+            cat > "$ZHIREN_CURRENT_STEP_FILE" << EOF
+{
+    "step": "$step_name",
+    "state": "Error",
+    "errorCode": "TASK_NOT_GENERATED"
+}
+EOF
             return
         fi
     fi
@@ -473,7 +486,13 @@ run_step() {
         next_step="${STEPS[$step_num]}"
     fi
     log "INFO" "Save the next step:$next_step. File Path:$ZHIREN_CURRENT_STEP_FILE" >&2
-    echo -n "$next_step" > "$ZHIREN_CURRENT_STEP_FILE"
+    cat > "$ZHIREN_CURRENT_STEP_FILE" << EOF
+{
+    "step": "$step_name",
+    "state": "Success",
+    "nextStep": "$next_step"
+}
+EOF
 }
 
 find_step() {
@@ -516,7 +535,13 @@ main_loop() {
     for i in $(seq 1 $MAX_ITERATIONS); do
         local current_step="PLAN"
         if [[ -s "$ZHIREN_CURRENT_STEP_FILE" ]]; then
-            current_step=$(<"$ZHIREN_CURRENT_STEP_FILE")
+            current_step=$(jq -r '
+    if (.nextStep | length > 0) then 
+        .nextStep 
+    else 
+        .step 
+    end
+' $ZHIREN_CURRENT_STEP_FILE)
         fi
         # 找到起始步骤的索引
         local current_idx=$(find_step "$current_step")
@@ -558,11 +583,12 @@ main_loop() {
             
             case "$step" in
                 "PLAN")
-                    local run_step_result=$(run_step "$step_num" "$step" "$CONTEXT
+                    run_step "$step_num" "$step" "$CONTEXT
 
-$ACTIVE_PLAN_PROMPT" "Analyzing..." "$i")
+$ACTIVE_PLAN_PROMPT" "Analyzing..." "$i"
+                    local error_code=$(jq -r '.errorCode' $ZHIREN_CURRENT_STEP_FILE)
                     # PLAN 步骤的特殊检查
-                    if [[ "$run_step_result" == "TASK_NOT_GENERATED" ]]; then
+                    if [[ "$error_code" == "TASK_NOT_GENERATED" ]]; then
                         break  # 这会跳出 while 循环
                     fi
                     ;;
