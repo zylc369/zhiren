@@ -386,8 +386,10 @@ if [[ ! -f "$CONTEXT_FILE" ]]; then
 fi
 
 # Main mode testing guidance (injected into context)
-MAIN_MODE_HEADER="## DEVELOPMENT MODE - Testing Requirements
+MAIN_MODE_HEADER="## Introduction
+You are Zhiren, an autonomous AI development agent.
 
+## DEVELOPMENT MODE - Testing Requirements
 **Testing is CRITICAL for the feedback loop:**
 - If no tests exist yet → flag as 🟡 ISSUE: \"No tests - add test for this feature\"
 - If tests exist but don't cover new code → flag as 🟡 ISSUE: \"Add test coverage\"
