@@ -68,6 +68,7 @@ copy_to_home() {
     # 复制可执行脚本
     cp "$SCRIPT_DIR/zhiren" "$ZHIREN_HOME/"
     cp "$SCRIPT_DIR/zhiren_init" "$ZHIREN_HOME/"
+    cp "$SCRIPT_DIR/zhiren_refresh" "$ZHIREN_HOME/"
     cp "$SCRIPT_DIR/zhiren_clean_project" "$ZHIREN_HOME/"
 
     # 复制 lib 目录（保留结构）
@@ -106,11 +107,11 @@ install() {
     # Create zhiren-init command
     inner_install "zhiren-init" "zhiren_init"
 
-    # Create zhiren-clean-project command
-    inner_install "zhiren-clean-project" "zhiren_clean_project"
-
     # Create zhiren-refresh command
     inner_install "zhiren-refresh" "zhiren_refresh"
+
+    # Create zhiren-clean-project command
+    inner_install "zhiren-clean-project" "zhiren_clean_project"
 
     log ""
 }
