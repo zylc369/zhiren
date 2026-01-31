@@ -464,8 +464,8 @@ EOF
 
     # PLAN 步骤的特殊检查
     if [[ "$step_name" == "PLAN" ]]; then
-        if [[ ! -f "$TASK_STATE" ]]; then
-            log "ERROR" "PLAN STEP failed: No .task file found. Continuing with PLAN STEP."
+        if [[ ! -f "$CURRENT_TASK_FILE_PATH" ]]; then
+            log "ERROR" "PLAN STEP failed: No ${CURRENT_TASK_FILE_NAME} file found. Continuing with PLAN STEP."
             cat > "$ZHIREN_CURRENT_STEP_FILE" << EOF
 {
     "step": "$step_name",
@@ -558,7 +558,7 @@ main_loop() {
         # Check for remaining tasks
         if ! grep -q '^\s*- \[ \]' "$TASK_FILE"; then
             log "SUCCESS" "All tasks complete!"
-            rm -f "$TASK_STATE"
+            rm -f "$CURRENT_TASK_FILE_PATH"
             exit 0
         fi
 

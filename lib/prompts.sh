@@ -7,6 +7,7 @@ set -eu
 LIB_PROMPT_SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
 # 导入 prompt
+source "$LIB_PROMPT_SCRIPT_DIR/prompt/prompt_common.sh"
 source "$LIB_PROMPT_SCRIPT_DIR/prompt/prompt_init.sh"
 source "$LIB_PROMPT_SCRIPT_DIR/prompt/prompt_plan.sh"
 source "$LIB_PROMPT_SCRIPT_DIR/prompt/prompt_execute.sh"

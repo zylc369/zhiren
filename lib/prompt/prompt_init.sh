@@ -5,7 +5,6 @@
 set -eu
 
 get_init_prompt() {
-    local task_file_path="${1:-$DEFAULT_CURRENT_TASK_FILE_PATH}"
     read -r -d '' prompt_content << EOF
 # PROJECT INITIALIZATION (Planning Only)
 
@@ -75,10 +74,6 @@ Create specs that ADD VALUE - don't create empty scaffolds:
 - Don't create tasks for "start server" or other manual user actions
 - **For existing projects**: Don't recreate what already exists!
 
-## Path Description
-- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
-- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
-- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 
 Read the **IDEA CONTENT**, understand the vision, create the planning files. Implementation happens later.
 EOF

@@ -13,7 +13,7 @@ get_execute_prompt() {
 - Do NOT ask questions or request approval - execute the plan
 - Be direct and factual - no conversational language needed
 
-Read .task file. Follow the plan exactly.
+Read $CURRENT_TASK_FILE_NAME file. Follow the plan exactly.
 
 **Your primary job is IMPLEMENTATION - use Write and Edit tools to create/modify files.**
 The PLAN phase already researched the codebase. Trust the plan's EXISTING_CODE and PATTERNS.
@@ -34,11 +34,6 @@ You may read files when needed for implementation, but prioritize writing code o
 
 ## When Done
 Read prompt_snippet_execute_when_done.md [in PROMPT SNIPPET DIRECTORY].
-
-## Path Description
-- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
-- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
-- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 EOF
     
     echo "$prompt_content"

@@ -13,7 +13,7 @@ get_fix_prompt() {
 - Do NOT ask questions or request approval - just fix the issues
 - Be direct and factual - no conversational language needed
 
-Read REVIEW_RESULT in .task file. Fix issues by priority.
+Read REVIEW_RESULT in $CURRENT_TASK_FILE_NAME file. Fix issues by priority.
 
 ## NOTHING TO FIX? STOP HERE.
 If REVIEW shows:
@@ -23,7 +23,7 @@ If REVIEW shows:
 - No ISSUES (empty or "none")
 
 Then there is NOTHING for you to do. Simply:
-1. Delete the .task file
+1. Delete the $CURRENT_TASK_FILE_NAME file
 2. Ensure task is marked \`- [x]\` in TASKS.md
 3. STOP IMMEDIATELY - do NOT implement new code, do NOT start new tasks
 
@@ -33,14 +33,14 @@ The FIX step ONLY fixes problems found by REVIEW. It does NOT:
 - Add improvements not flagged by REVIEW
 - Do anything beyond fixing flagged issues
 
-If there are no issues, your entire job is: delete .task, mark complete, done.
+If there are no issues, your entire job is: delete $CURRENT_TASK_FILE_NAME, mark complete, done.
 
 ## Priority Order (only if issues exist)
 Read prompt_snippet_fix_priority_order.md [in PROMPT SNIPPET DIRECTORY].
 
 ## If OUTCOME_ACHIEVED is "no"
 The implementation doesn't do what the task required. You must:
-1. Read EXPECTED_OUTCOME and OUTCOME_EVIDENCE from .task
+1. Read EXPECTED_OUTCOME and OUTCOME_EVIDENCE from $CURRENT_TASK_FILE_NAME
 2. Figure out WHY the outcome wasn't achieved
 3. Fix the implementation until the outcome IS achieved
 4. Re-verify the outcome yourself before proceeding
@@ -66,11 +66,6 @@ Read prompt_snippet_fix_never_cheat_on_tests.md [in PROMPT SNIPPET DIRECTORY].
 
 ## After Fixing
 Read prompt_snippet_fix_after_fixing.md [in PROMPT SNIPPET DIRECTORY].
-
-## Path Description
-- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
-- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
-- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 EOF
     
     echo "$prompt_content"

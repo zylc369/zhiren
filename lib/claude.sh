@@ -91,7 +91,11 @@ run_claude() {
 
 ---
 
-$(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
+$(get_verbose_output_rules "$ZHIREN_TMP_DIR")
+
+---
+
+$(get_file_maps_prompt)"
     fi
     #----------------------------------------------------------------------------
 
@@ -202,11 +206,11 @@ $(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
         claude_failure_msg_array+=("=== CLAUDE OUTPUT ===")
         claude_failure_msg_array+=("$output")
         claude_failure_msg_array+=("")
-        claude_failure_msg_array+=("=== CURRENT .task FILE (if exists) ===")
-        if [[ -f "$TASK_STATE" ]]; then
-            claude_failure_msg_array+=("Path: $TASK_STATE")
+        claude_failure_msg_array+=("=== CURRENT ${CURRENT_TASK_FILE_NAME} FILE (if exists) ===")
+        if [[ -f "$CURRENT_TASK_FILE_PATH" ]]; then
+            claude_failure_msg_array+=("Path: $CURRENT_TASK_FILE_PATH")
         else
-            claude_failure_msg_array+=("(no .task file)")
+            claude_failure_msg_array+=("(no ${CURRENT_TASK_FILE_NAME} file)")
         fi
         log_ai_response "ERROR" "$request_id" "$(printf "%s\n" "${claude_failure_msg_array[@]}")"
 

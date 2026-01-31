@@ -23,13 +23,13 @@ You are planning ONE task from TASKS.md.
 3. **Parse the task**: Extract ACTION and OUTCOME (format: \`Action → Outcome\`)
 4. Read specs/ folder for detailed specifications
 5. Search the codebase for existing patterns, utilities, components
-6. Write a plan to .task file
+6. Write a plan to $CURRENT_TASK_FILE_NAME file
 
 ## STOP: Verify Task Is Actually Unchecked
 Before planning, CONFIRM the task line starts with \`- [ ]\` (space between brackets).
-If it starts with \`- [x]\`, it's ALREADY DONE - do not plan it, do not create .task file.
+If it starts with \`- [x]\`, it's ALREADY DONE - do not plan it, do not create $CURRENT_TASK_FILE_NAME file.
 
-## Write to .task file:
+## Write to $CURRENT_TASK_FILE_NAME file:
 Read prompt_snippet_plan_write_to_task.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Architecture Principles
@@ -39,10 +39,6 @@ Read prompt_snippet_plan_write_to_task.md [in PROMPT SNIPPET DIRECTORY].
 - Follow existing patterns in codebase
 - Match existing code style
 
-## Path Description
-- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
-- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
-- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 
 DO NOT implement unless explicitly asked. Just plan.
 EOF
@@ -76,13 +72,13 @@ You are planning UP TO $batch_size RELATED tasks from TASKS.md.
    - Don't force grouping - only batch what naturally belongs together
 5. Read specs/ folder for detailed specifications
 6. Search the codebase for existing patterns, utilities, components
-7. Write a plan to .task file
+7. Write a plan to $CURRENT_TASK_FILE_NAME file
 
 ## STOP: Verify Tasks Are Actually Unchecked
 Before planning, CONFIRM each task line starts with \`- [ ]\` (space between brackets).
 Skip any task marked \`- [x]\` (already complete).
 
-## Write to .task file:
+## Write to $CURRENT_TASK_FILE_NAME file:
 \`\`\`
 TASKS:
 - [exact task 1 text from TASKS.md]

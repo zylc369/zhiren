@@ -15,10 +15,10 @@ get_review_prompt() {
 - The FIX step will automatically process everything you report
 - Be direct and factual - no conversational language needed
 
-Review implementation against .task plan.
+Review implementation against $CURRENT_TASK_FILE_NAME plan.
 
 ## 1. VERIFY OUTCOME FIRST (Most Important!)
-Read EXPECTED_OUTCOME and OUTCOME_VERIFICATION from .task file.
+Read EXPECTED_OUTCOME and OUTCOME_VERIFICATION from $CURRENT_TASK_FILE_NAME file.
 Actually run the verification steps to confirm the outcome was achieved:
 - If it says "button exists with href=/login" → grep/search for it
 - If it says "API returns 200" → curl the endpoint
@@ -37,7 +37,7 @@ Actually run the verification steps to confirm the outcome was achieved:
 Read prompt_snippet_review_auto_detect.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Run Checks
-Use TEST_COMMAND from .task file (or detect from CONTEXT.md)
+Use TEST_COMMAND from $CURRENT_TASK_FILE_NAME file (or detect from CONTEXT.md)
 
 ## Testing Approach
 Check what testing infrastructure exists in the project:
@@ -65,13 +65,8 @@ Before flagging unused code, check TASKS.md:
 
 Don't suppress warnings for scaffolding. Don't keep actual dead code.
 
-## Append to .task:
+## Append to $CURRENT_TASK_FILE_NAME:
 Read prompt_snippet_review_append_to_task.md [in PROMPT SNIPPET DIRECTORY].
-
-## Path Description
-- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
-- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
-- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 EOF
     
     echo "$prompt_content"
