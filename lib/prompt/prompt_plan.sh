@@ -39,8 +39,9 @@ Read prompt_snippet_plan_write_to_task.md [in PROMPT SNIPPET DIRECTORY].
 - Follow existing patterns in codebase
 - Match existing code style
 
-## Directory and File Path
-- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+## Path Description
+- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
+- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
 - PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 
 DO NOT implement unless explicitly asked. Just plan.

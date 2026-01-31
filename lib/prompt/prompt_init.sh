@@ -75,8 +75,9 @@ Create specs that ADD VALUE - don't create empty scaffolds:
 - Don't create tasks for "start server" or other manual user actions
 - **For existing projects**: Don't recreate what already exists!
 
-## Directory and File Path
-- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+## Path Description
+- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
+- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
 - PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 
 Read the **IDEA CONTENT**, understand the vision, create the planning files. Implementation happens later.

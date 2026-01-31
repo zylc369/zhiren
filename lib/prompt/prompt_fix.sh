@@ -67,8 +67,9 @@ Read prompt_snippet_fix_never_cheat_on_tests.md [in PROMPT SNIPPET DIRECTORY].
 ## After Fixing
 Read prompt_snippet_fix_after_fixing.md [in PROMPT SNIPPET DIRECTORY].
 
-## Directory and File Path
-- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+## Path Description
+- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
+- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
 - PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 EOF
     

@@ -48,7 +48,7 @@ Check what testing infrastructure exists in the project:
 Read prompt_snippet_review_classify_issues.md [in PROMPT SNIPPET DIRECTORY].
 
 ## CRITICAL: Environment Issues Are SOLVABLE, Not Blockers
-Read prompt_review_env_issues.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_review_env_issues.md [in PROMPT SNIPPET DIRECTORY].
 
 ## CRITICAL: Pre-existing Issues MUST Be Flagged
 If you discover a broken build, failing tests, or other issues:
@@ -68,8 +68,9 @@ Don't suppress warnings for scaffolding. Don't keep actual dead code.
 ## Append to .task:
 Read prompt_snippet_review_append_to_task.md [in PROMPT SNIPPET DIRECTORY].
 
-## Directory and File Path
-- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+## Path Description
+- Current Working Directory (cwd for short): \`$ZHIREN_PROJECT_ROOT\`. Code will be generated into the cwd.
+- Zhiren Project Info Directory: \`[cwd]/.zhiren\` .All files or directories without an explicitly specified path (e.g., .task, TASKS.md, CONTEXT.md, specs/) will be stored here.
 - PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 EOF
     
