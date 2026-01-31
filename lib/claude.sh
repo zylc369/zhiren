@@ -177,7 +177,7 @@ $(get_file_maps_prompt)"
         if [[ $exit_code -eq 0 ]]; then
             # Output the result (so it still shows on screen)
             log_ai_response "SUCCESS" "$request_id" "$output"
-            log "INFO" "$phase phase completed successfully"
+            log "SUCCESS" "$phase phase completed successfully"
             return 0
         fi
 
