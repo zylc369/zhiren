@@ -417,8 +417,9 @@ if [[ "$SAFE_MODE" == true ]]; then
     echo ""
 fi
 
+STEPS=("PLAN" "EXECUTE" "REVIEW" "FIX")
 run_step() {
-    local step_index="$1"
+    local step_num="$1"
     local step_name="$2"
     local use_prompt="$3"
     local purpose="${4:-...}"
@@ -427,22 +428,28 @@ run_step() {
     log "INFO" "First save the current step:$step_name. File Path:$ZHIREN_CURRENT_STEP_FILE"
     echo -n "$step_name" > "$ZHIREN_CURRENT_STEP_FILE"
 
-    log "LIGHT3" "[${step_index}/4 ${step_name}] $purpose"
+    log "LIGHT3" "[${step_num}/4 ${step_name}] $purpose"
     if ! inner_run_claude "$use_prompt" "$step_name" "$loop_count"; then
         log "ERROR" "$step_name STEP failed after $MAX_RETRIES retries - aborting"
         exit 1
     fi
-}
 
-STEPS=("PLAN" "EXECUTE" "REVIEW" "FIX")
+    local next_step=""
+    # 步骤数组数量
+    local step_len=${#STEPS[@]}
+    if [[ $step_num -ge $step_len ]]; then
+        # 当前步骤数大于步骤数组数量，下一个步骤必须是数组的第一个元素
+        next_step="${STEPS[0]}"
+    else
+        # step_num是数组索引+1，所以下一个步骤直接将它当做索引
+        next_step="${STEPS[$step_num]}"
+    fi
+    log "INFO" "Save the next step:$next_step. File Path:$ZHIREN_CURRENT_STEP_FILE"
+    echo -n "$next_step" > "$ZHIREN_CURRENT_STEP_FILE"
+}
 
 # Start main loop
 main_loop() {
-    local initial_step="PLAN"
-    if [[ -s "$ZHIREN_CURRENT_STEP_FILE" ]]; then
-        initial_step=$(<"$ZHIREN_CURRENT_STEP_FILE")
-    fi
-
     # Log session start
     log "INFO" "=== Zhiren session started ==="
     log "INFO" "Max iterations: $MAX_ITERATIONS, Safe mode: $SAFE_MODE, Batch mode: $BATCH_MODE (size: $BATCH_SIZE)"
@@ -453,24 +460,28 @@ main_loop() {
         log "LIGHT" "Batch mode: up to $BATCH_SIZE related tasks per iteration"
     fi
 
-    # 找到起始步骤的索引
-    local current_idx=-1
-    for i in "${!STEPS[@]}"; do
-        if [[ "${STEPS[$i]}" == "$initial_step" ]]; then
-            current_idx=$i
-            break
-        fi
-    done
-    if [[ $current_idx -eq -1 ]]; then
-        log "ERROR" "无效步骤:$initial_step"
-        exit 1
-    fi
-
-    log "LIGHT" "Loop: PLAN → EXECUTE → REVIEW → FIX. Initial step: $initial_step, step index:$current_idx."
+    log "LIGHT" "Loop: PLAN → EXECUTE → REVIEW → FIX."
     log "INFO" "Logs: $LOG_FILE"
     log "INFO" ""
 
     for i in $(seq 1 $MAX_ITERATIONS); do
+        local current_step="PLAN"
+        if [[ -s "$ZHIREN_CURRENT_STEP_FILE" ]]; then
+            current_step=$(<"$ZHIREN_CURRENT_STEP_FILE")
+        fi
+        # 找到起始步骤的索引
+        local current_idx=-1
+        for i in "${!STEPS[@]}"; do
+            if [[ "${STEPS[$i]}" == "$current_step" ]]; then
+                current_idx=$i
+                break
+            fi
+        done
+        if [[ $current_idx -eq -1 ]]; then
+            log "ERROR" "无效步骤:$current_step"
+            exit 1
+        fi
+
         # Load context fresh each iteration
         load_context
 
@@ -482,7 +493,7 @@ main_loop() {
         fi
 
         REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" || echo "0")
-        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING tasks remaining) ==="
+        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING tasks remaining).Initial step: $current_step, index:$current_idx. ==="
 
         # Select prompts based on batch mode
         if [[ "$BATCH_MODE" == true ]]; then
@@ -499,11 +510,12 @@ main_loop() {
 
         # 循环执行从起始步骤开始的所有步骤
         while [[ $current_idx -lt ${#STEPS[@]} ]]; do
-            step="${STEPS[$current_idx]}"
+            local step="${STEPS[$current_idx]}"
+            local step_num=$((current_idx + 1))
             
             case "$step" in
                 "PLAN")
-                    run_step "$current_idx" "$step" "$CONTEXT
+                    run_step "$step_num" "$step" "$CONTEXT
 
 $ACTIVE_PLAN_PROMPT" "Analyzing..." "$i"
                     
@@ -515,19 +527,19 @@ $ACTIVE_PLAN_PROMPT" "Analyzing..." "$i"
                     ;;
                     
                 "EXECUTE")
-                    run_step "$current_idx" "$step" "$CONTEXT
+                    run_step "$step_num" "$step" "$CONTEXT
 
 $ACTIVE_EXECUTE_PROMPT" "Implementing..." "$i"
                     ;;
                     
                 "REVIEW")
-                    run_step "$current_idx" "$step" "$CONTEXT
+                    run_step "$step_num" "$step" "$CONTEXT
 
 $ACTIVE_REVIEW_PROMPT" "Reviewing..." "$i"
                     ;;
                     
                 "FIX")
-                    run_step "$current_idx" "$step" "$CONTEXT
+                    run_step "$step_num" "$step" "$CONTEXT
 
 $ACTIVE_FIX_PROMPT" "Fixing..." "$i"
                     ;;
