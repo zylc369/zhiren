@@ -463,10 +463,10 @@ main_loop() {
 
         # 计算已完成任务百分比，保留两位小数
         local tasks_completed=$((all_tasks_count - REMAINING))
-        local tasks_completed_percent=$(awk -v c=$completed -v t=$total 'BEGIN {printf "%.2f", c/t*100}')
+        local tasks_completed_percent=$(awk -v c=$tasks_completed -v t=$all_tasks_count 'BEGIN {printf "%.2f%%", c/t*100}')
 
         REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" | xargs || echo "0")
-        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING of $all_tasks_count tasks remaining, $tasks_completed_percent complete). $current_step step. ==="
+        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING of $all_tasks_count tasks remaining, $tasks_completed_percent completed). $current_step step. ==="
 
         # Select prompts based on batch mode
         if [[ "$BATCH_MODE" == true ]]; then
