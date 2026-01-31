@@ -50,6 +50,7 @@ export ZHIREN_EXECUTE_SCENE=""
 # Source library components
 source "$SCRIPT_DIR/lib/tools.sh"
 source "$SCRIPT_DIR/lib/consts.sh"
+source "$SCRIPT_DIR/lib/date_utils.sh"
 
 # session相关变量
 ZHIREN_CLAUDE_SESSION_FILE="${PROJECT_ZHIREN_DIR}/claude_session_id"
@@ -474,6 +475,9 @@ EOF
 EOF
             return
         fi
+
+        # 任务归档
+        task_archiving "$CURRENT_TASK_FILE_PATH"
     fi
 
     local next_step=""

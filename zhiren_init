@@ -25,6 +25,7 @@ ZHIREN_CLAUDE_SESSION_ID=$(uuidgen)
 # Source library components
 source "$SCRIPT_DIR/lib/tools.sh"
 source "$SCRIPT_DIR/lib/consts.sh"
+source "$SCRIPT_DIR/lib/date_utils.sh"
 source "$SCRIPT_DIR/lib/log.sh"
 source "$SCRIPT_DIR/lib/prompts.sh"
 source "$SCRIPT_DIR/lib/safe_mode.sh"
