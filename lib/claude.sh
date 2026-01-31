@@ -11,10 +11,13 @@ set -eu
 # 2: API 5小时使用上限错误
 # 3: 流式模式错误
 inner_log_with_error_output() {
-    local phase="$1"
-    local attempt="$2"
-    local exit_code="$3"
-    local output="$4"
+    local request_id="$1"
+    local phase="$2"
+    local attempt="$3"
+    local exit_code="$4"
+    local output="$5"
+
+    log_ai_response "ERROR" "$request_id" "$output"
 
     # Check for the specific streaming error
     if echo "$output" | grep -qi "only prompt commands are supported in streaming mode"; then
@@ -149,7 +152,7 @@ $(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
             local old_trap_err=$(trap -p ERR)
             local old_trap_int=$(trap -p INT)
 
-            # 设置错误处理
+            # # 设置错误处理
             trap 'echo "在文件 claude.sh 中出错: 第 $LINENO 行，状态: $?" >&2' ERR
             # 设置Ctrl+C处理
             trap 'echo -e "\n检测到Ctrl+C，正在终止..." >&2; exit 130' INT
@@ -157,8 +160,10 @@ $(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
             # Run on host (existing behavior), capture output
             # -p: 打印响应并退出（适用于管道操作）。注意：当Claude以-p模式运行时，会跳过工作区信任对话框。请仅在受信任的目录中使用此标志。
             # --dangerously-skip-permissions: 绕过所有权限检查。建议仅在无网络访问的沙箱环境中使用。
+            set +e # 临时关闭 errexit
             output=$(claude "${claude_args[@]}" 2>&1)
             exit_code=$?
+            set -e   # 重新启用
 
             # 恢复之前的trap
             eval "$old_trap_err"
@@ -175,7 +180,7 @@ $(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
         #------------------------------------------------------------
         # 打印错误信息
 
-        inner_log_with_error_output "$phase" "$attempt" "$exit_code" "$output"
+        inner_log_with_error_output "$request_id" "$phase" "$attempt" "$exit_code" "$output"
         local error_type=$?
         if [[ $error_type -eq 2 ]]; then
             # API X-hour limit reached, no point retrying
