@@ -48,11 +48,7 @@ Check what testing infrastructure exists in the project:
 Read prompt_snippet_review_classify_issues.md [in PROMPT SNIPPET DIRECTORY].
 
 ## CRITICAL: Environment Issues Are SOLVABLE, Not Blockers
-If you encounter an environment issue (missing tool, dependency, wrong setup):
-- This is NOT a blocker - it's a SOLVABLE ISSUE
-- Examples: "Chrome not installed", "missing npm package", "Docker needs config"
-- Mark as: 🔧 ENVIRONMENT ISSUE (not BLOCKER)
-- Include REMEDIATION: what needs to be installed/configured to fix it
+Read prompt_review_env_issues.md [in PROMPT SNIPPET DIRECTORY].
 
 ## CRITICAL: Pre-existing Issues MUST Be Flagged
 If you discover a broken build, failing tests, or other issues:

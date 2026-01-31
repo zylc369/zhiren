@@ -36,11 +36,7 @@ The FIX step ONLY fixes problems found by REVIEW. It does NOT:
 If there are no issues, your entire job is: delete .task, mark complete, done.
 
 ## Priority Order (only if issues exist)
-1. ❌ OUTCOME_ACHIEVED: no - The task isn't done! Fix implementation first.
-2. 🔧 ENVIRONMENT_ISSUES - CREATE REMEDIATION TASKS
-3. 🔴 BLOCKERS - code issues that must be fixed
-4. 🟡 ISSUES - fix if straightforward
-5. 🟢 SUGGESTIONS - fix only if trivial
+Read prompt_snippet_fix_priority_order.md [in PROMPT SNIPPET DIRECTORY].
 
 ## If OUTCOME_ACHIEVED is "no"
 The implementation doesn't do what the task required. You must:
