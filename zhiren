@@ -448,6 +448,17 @@ run_step() {
     echo -n "$next_step" > "$ZHIREN_CURRENT_STEP_FILE"
 }
 
+find_step() {
+    local current_step="$1"
+    for i in "${!STEPS[@]}"; do
+        if [[ "${STEPS[$i]}" == "$current_step" ]]; then
+            echo "$1"
+            return
+        fi
+    done
+    echo "-1"
+}
+
 # Start main loop
 main_loop() {
     # Log session start
@@ -470,13 +481,7 @@ main_loop() {
             current_step=$(<"$ZHIREN_CURRENT_STEP_FILE")
         fi
         # 找到起始步骤的索引
-        local current_idx=-1
-        for i in "${!STEPS[@]}"; do
-            if [[ "${STEPS[$i]}" == "$current_step" ]]; then
-                current_idx=$i
-                break
-            fi
-        done
+        local current_idx=$(find_step "$current_step")
         if [[ $current_idx -eq -1 ]]; then
             log "ERROR" "无效步骤:$current_step"
             exit 1
