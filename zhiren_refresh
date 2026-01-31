@@ -50,15 +50,6 @@ refresh_tasks() {
     local context_content=$(cat "$CONTEXT_FILE")
     local tasks_content=$(cat "$TASK_FILE")
 
-    # Read CLAUDE.md if exists
-    local CLAUDE_MD=""
-    if [[ -f "CLAUDE.md" ]]; then
-        CLAUDE_MD="
-## Project Rules (from CLAUDE.md):
-$(cat CLAUDE.md)
-"
-    fi
-
     local user_prompt="# USER'S NOTES:
 
 $notes_content
@@ -71,11 +62,24 @@ $context_content
 ---
 
 ## CURRENT TASKS.md:
-$tasks_content
+$tasks_content"
+
+    # Read CLAUDE.md if exists
+    local CLAUDE_MD=""
+    if [[ -f "CLAUDE.md" ]]; then
+        CLAUDE_MD="## Project Rules (from CLAUDE.md):
+\`\`\`markdown
+$(cat CLAUDE.md)
+\`\`\`
+"
+        user_prompt="$user_prompt
 
 ---
 
-$CLAUDE_MD
+$CLAUDE_MD"
+    fi
+
+    user_prompt="$user_prompt
 
 ---
 
