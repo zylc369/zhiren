@@ -72,6 +72,7 @@ log "INFO" "LOG_DIR=$LOG_DIR"
 log "INFO" "LOG_FILE=$LOG_FILE"
 log "INFO" "ZHIREN_TMP_DIR=$ZHIREN_TMP_DIR"
 log "INFO" "ZHIREN_CLAUDE_SESSION_FILE=$ZHIREN_CLAUDE_SESSION_FILE"
+log "INFO" "CURRENT_TASK_FILE_PATH=$CURRENT_TASK_FILE_PATH"
 log "INFO" ""
 
 # Instance-specific temp folder for verbose command output
@@ -465,7 +466,7 @@ EOF
     # PLAN 步骤的特殊检查
     if [[ "$step_name" == "PLAN" ]]; then
         if [[ ! -f "$CURRENT_TASK_FILE_PATH" ]]; then
-            log "ERROR" "PLAN STEP failed: No ${CURRENT_TASK_FILE_NAME} file found. Continuing with PLAN STEP."
+            log "ERROR" "PLAN STEP failed: No ${CURRENT_TASK_FILE_NAME} file found. File expected path: $CURRENT_TASK_FILE_PATH. Continuing with PLAN STEP."
             cat > "$ZHIREN_CURRENT_STEP_FILE" << EOF
 {
     "step": "$step_name",
