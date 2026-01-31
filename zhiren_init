@@ -220,11 +220,17 @@ $CLAUDE_MD
 
 $INIT_PROMPT"
 
+zhiren_step="INIT"
 run_claude "user_prompt" "$user_prompt" \
-    "phase" "INIT" \
+    "phase" "$zhiren_step" \
     "session_is_new" "$ZHIREN_CLAUDE_SESSION_IS_NEW" \
     "session_id" "$ZHIREN_CLAUDE_SESSION_ID" \
     "save_mode" "false"
+local claude_exit_code=$?
+if [[ ! $claude_exit_code -eq 0 ]]; then
+    log "ERROR" "[$zhiren_step] Claude failed, exit code $claude_exit_code"
+    exit $claude_exit_code
+fi
 
 # Verify files were created
 if [[ -f "$CONTEXT_FILE" ]] && [[ -f "$TASK_FILE" ]]; then
