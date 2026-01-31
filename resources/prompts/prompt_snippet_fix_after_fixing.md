@@ -3,7 +3,7 @@ If all fixed + tests pass:
 - Ensure task is marked `- [x]` in TASKS.md (with note if useful)
 
 If environment issue found:
-- Add remediation task to TASKS.md (see above)
+- Add remediation task to TASKS.md (see `Handling ENVIRONMENT_ISSUES (Critical!)`)
 - Unmark current task
 - Delete .task file
 - CONTINUE (not blocked!)

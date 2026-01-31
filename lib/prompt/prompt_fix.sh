@@ -51,7 +51,7 @@ The implementation doesn't do what the task required. You must:
 This is NOT optional - a task without its outcome is not done.
 
 ## Handling ENVIRONMENT_ISSUES (Critical!)
-Read prompt_fix_handling_env_issues_rules.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_fix_handling_env_issues.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Your Job for Code Issues
 1. Fix BLOCKERS (mandatory)
@@ -66,10 +66,10 @@ you MUST fix it. Don't skip issues because "another task caused it."
 A broken codebase blocks all future work - fix it now.
 
 ## NEVER Cheat on Tests
-Read prompt_fix_never_cheat_on_tests_rules.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_fix_never_cheat_on_tests.md [in PROMPT SNIPPET DIRECTORY].
 
 ## After Fixing
-Read prompt_fix_after_fixing_rules.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_fix_after_fixing.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Directory and File Path
 - Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.

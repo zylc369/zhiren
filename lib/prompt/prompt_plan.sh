@@ -30,7 +30,7 @@ Before planning, CONFIRM the task line starts with \`- [ ]\` (space between brac
 If it starts with \`- [x]\`, it's ALREADY DONE - do not plan it, do not create .task file.
 
 ## Write to .task file:
-Read prompt_plan_write_to_task_file.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_plan_write_to_task.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Architecture Principles
 - REUSE existing code - search first

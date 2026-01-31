@@ -33,7 +33,7 @@ You may read files when needed for implementation, but prioritize writing code o
 - Comments explain WHY not WHAT
 
 ## When Done
-Read prompt_execute_when_done_rules.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_execute_when_done.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Directory and File Path
 - Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.

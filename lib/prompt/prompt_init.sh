@@ -53,10 +53,10 @@ Unless user explicitly says "no tests", you MUST include testing:
 ## Phase 3: Create Files
 
 ### 1. CONTEXT.md (static reference for development)
-Read prompt_init_create_context_file_specs.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_init_create_context.md [in PROMPT SNIPPET DIRECTORY].
 
 ### 2. TASKS.md
-Read prompt_init_create_tasks_file_specs.md [in PROMPT SNIPPET DIRECTORY].
+Read prompt_snippet_init_create_tasks.md [in PROMPT SNIPPET DIRECTORY].
 
 ### 3. specs/ folder (only if needed)
 Create specs that ADD VALUE - don't create empty scaffolds:
