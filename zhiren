@@ -135,9 +135,7 @@ SAFE_MODE=false
 
 INNER_RUN_CLAUDE_FIRST_RUN=true
 inner_run_claude() {
-    echo "inner_run_claude 0"
     init_claude_session
-    echo "inner_run_claude 1"
 
     local user_prompt="$1"
     local phase="$2"
@@ -520,9 +518,11 @@ find_step() {
 
 # Start main loop
 main_loop() {
+    local all_tasks_count=$(grep -c '^\s*- \[[ xX]\]' "$TASK_FILE" 2>/dev/null || echo "0")
+
     # Log session start
     log "INFO" "=== Zhiren session started ==="
-    log "INFO" "Max iterations: $MAX_ITERATIONS, Safe mode: $SAFE_MODE, Batch mode: $BATCH_MODE (size: $BATCH_SIZE)"
+    log "INFO" "Total tasks: $all_tasks_count, Max iterations: $MAX_ITERATIONS, Safe mode: $SAFE_MODE, Batch mode: $BATCH_MODE (size: $BATCH_SIZE)"
     log "INFO" "Working directory: $(pwd)"
 
     log "LIGHT" "Zhiren starting - max $MAX_ITERATIONS iterations"
@@ -564,7 +564,7 @@ main_loop() {
         fi
 
         REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" || echo "0")
-        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING tasks remaining).Initial step: $current_step, index:$current_idx. ==="
+        log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING tasks remaining).Initial step: $current_step, index:$current_idx. Total tasks: $all_tasks_count. ==="
 
         # Select prompts based on batch mode
         if [[ "$BATCH_MODE" == true ]]; then
