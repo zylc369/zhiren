@@ -85,10 +85,11 @@ $CLAUDE_MD"
 
 $refresh_prompt"
 
+    init_claude_session
     local zhiren_step="REFRESH"
     run_claude "user_prompt" "$user_prompt" \
         "phase" "$zhiren_step" \
-        "session_is_new" "$ZHIREN_CLAUDE_SESSION_IS_NEW" \
+        "session_is_new" "true" \
         "session_id" "$ZHIREN_CLAUDE_SESSION_ID" \
         "save_mode" "false"
     local claude_exit_code=$?

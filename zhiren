@@ -102,6 +102,8 @@ SAFE_MODE=false
 
 INNER_RUN_CLAUDE_FIRST_RUN=true
 inner_run_claude() {
+    init_claude_session
+
     local user_prompt="$1"
     local phase="$2"
     local loop_count="${3:-}"

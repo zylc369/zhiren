@@ -18,10 +18,6 @@ ZHIREN_INSTANCE_ID="$$_$(date +%s)"
 ZHIREN_TMP_DIR="/tmp/zhiren-${ZHIREN_EXECUTE_SCENE}-${ZHIREN_INSTANCE_ID}"
 export ZHIREN_TMP_DIR
 
-# session相关变量
-ZHIREN_CLAUDE_SESSION_IS_NEW="true"
-ZHIREN_CLAUDE_SESSION_ID=$(uuidgen)
-
 # Source library components
 source "$SCRIPT_DIR/lib/tools.sh"
 source "$SCRIPT_DIR/lib/consts.sh"
@@ -220,10 +216,12 @@ $CLAUDE_MD
 
 $INIT_PROMPT"
 
+init_claude_session
+
 zhiren_step="INIT"
 run_claude "user_prompt" "$user_prompt" \
     "phase" "$zhiren_step" \
-    "session_is_new" "$ZHIREN_CLAUDE_SESSION_IS_NEW" \
+    "session_is_new" "true" \
     "session_id" "$ZHIREN_CLAUDE_SESSION_ID" \
     "save_mode" "false"
 local claude_exit_code=$?

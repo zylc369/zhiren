@@ -43,7 +43,6 @@ get_claude_session_id() {
     echo "$ZHIREN_CLAUDE_SESSION_ID"
 }
 
-init_claude_session
-
+export -f init_claude_session
 export -f get_claude_session_is_new
 export -f get_claude_session_id
