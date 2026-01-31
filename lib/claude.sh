@@ -86,6 +86,8 @@ run_claude() {
     if [[ "$disable_verbose_output_rules_prompt" != "true" ]]; then
         prompt="${prompt}
 
+---
+
 $(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
     fi
     #----------------------------------------------------------------------------
