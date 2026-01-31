@@ -104,7 +104,7 @@ $(get_verbose_output_rules "$ZHIREN_TMP_DIR")"
     fi
     claude_args+=("$prompt")
 
-    log "INFO" "Starting $phase phase (session_is_new: $session_is_new, session_id: $session_id, save_mode: $save_mode, prompt_size: $prompt_size bytes)"
+    log "INFO" "Starting $phase phase (session_is_new: $session_is_new, session_id: $session_id, save_mode: $save_mode, ${LOG_COLOR_YELLOW}prompt_size: $prompt_size bytes)"
 
     while [[ $attempt -le $MAX_RETRIES ]]; do
         log "INFO" "[run_claude] Attempt $attempt for $phase phase"

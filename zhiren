@@ -414,6 +414,19 @@ if [[ "$SAFE_MODE" == true ]]; then
     echo ""
 fi
 
+run_step() {
+    local step_index="$1"
+    local step_name="$2"
+    local use_prompt="$3"
+    local purpose="${4:-...}"
+    local loop_count="${5:-}"
+    log "LIGHT3" "[${step_index}/4 ${step_name}] $purpose"
+    if ! inner_run_claude "$use_prompt" "$step_name" "$loop_count"; then
+        log "ERROR" "$step_name STEP failed after $MAX_RETRIES retries - aborting"
+        exit 1
+    fi
+}
+
 # Start main loop
 main_loop() {
     # Log session start
@@ -457,45 +470,29 @@ main_loop() {
         fi
 
         # PLAN
-        log "LIGHT3" "[1/4 PLAN] Analyzing..."
-        if ! inner_run_claude "$CONTEXT
+        run_step "1" "PLAN" "$CONTEXT
 
-$ACTIVE_PLAN_PROMPT" "PLAN" "$i"; then
-            log "ERROR" "Plan phase failed after $MAX_RETRIES retries - aborting"
-            exit 1
-        fi
+$ACTIVE_PLAN_PROMPT" "Analyzing..." "$i"
 
         if [[ ! -f "$TASK_STATE" ]]; then
-            log "ERROR" "Plan failed - no .task file"
+            log "ERROR" "PLAN STEP failed - no .task file"
             continue
         fi
 
         # EXECUTE
-        log "LIGHT3" "[2/4 EXECUTE] Implementing..."
-        if ! inner_run_claude "$CONTEXT
+        run_step "2" "EXECUTE" "$CONTEXT
 
-$ACTIVE_EXECUTE_PROMPT" "EXECUTE" "$i"; then
-            log "ERROR" "Execute phase failed after $MAX_RETRIES retries - aborting"
-            exit 1
-        fi
+$ACTIVE_EXECUTE_PROMPT" "Implementing..." "$i"
 
         # REVIEW
-        log "LIGHT3" "[3/4 REVIEW] Reviewing..."
-        if ! inner_run_claude "$CONTEXT
+        run_step "3" "REVIEW" "$CONTEXT
 
-$ACTIVE_REVIEW_PROMPT" "REVIEW" "$i"; then
-            log "ERROR" "Review phase failed after $MAX_RETRIES retries - aborting"
-            exit 1
-        fi
+$ACTIVE_REVIEW_PROMPT" "Reviewing..." "$i"
 
         # FIX
-        log "LIGHT3" "[4/4 FIX] Fixing..."
-        if ! inner_run_claude "$CONTEXT
+        run_step "4" "FIX" "$CONTEXT
 
-$ACTIVE_FIX_PROMPT" "FIX" "$i"; then
-            log "ERROR" "Fix phase failed after $MAX_RETRIES retries - aborting"
-            exit 1
-        fi
+$ACTIVE_FIX_PROMPT" "Fixing..." "$i"
 
         sleep 2
     done
