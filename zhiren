@@ -54,6 +54,9 @@ source "$SCRIPT_DIR/lib/consts.sh"
 # session相关变量
 ZHIREN_CLAUDE_SESSION_FILE="${PROJECT_ZHIREN_DIR}/claude_session_id"
 
+# 当前执行的步骤记录文件
+ZHIREN_CURRENT_STEP_FILE="${PROJECT_ZHIREN_DIR}/zhiren_current_step"
+
 # Source library components
 source "$SCRIPT_DIR/lib/log.sh"
 source "$SCRIPT_DIR/lib/prompts.sh"
@@ -420,6 +423,10 @@ run_step() {
     local use_prompt="$3"
     local purpose="${4:-...}"
     local loop_count="${5:-}"
+
+    log "INFO" "First save the current step:$step_name. File Path:$ZHIREN_CURRENT_STEP_FILE"
+    echo -n "$step_name" > "$ZHIREN_CURRENT_STEP_FILE"
+
     log "LIGHT3" "[${step_index}/4 ${step_name}] $purpose"
     if ! inner_run_claude "$use_prompt" "$step_name" "$loop_count"; then
         log "ERROR" "$step_name STEP failed after $MAX_RETRIES retries - aborting"
@@ -427,8 +434,15 @@ run_step() {
     fi
 }
 
+STEPS=("PLAN" "EXECUTE" "REVIEW" "FIX")
+
 # Start main loop
 main_loop() {
+    local initial_step="PLAN"
+    if [[ -s "$ZHIREN_CURRENT_STEP_FILE" ]]; then
+        initial_step=$(<"$ZHIREN_CURRENT_STEP_FILE")
+    fi
+
     # Log session start
     log "INFO" "=== Zhiren session started ==="
     log "INFO" "Max iterations: $MAX_ITERATIONS, Safe mode: $SAFE_MODE, Batch mode: $BATCH_MODE (size: $BATCH_SIZE)"
@@ -438,7 +452,21 @@ main_loop() {
     if [[ "$BATCH_MODE" == true ]]; then
         log "LIGHT" "Batch mode: up to $BATCH_SIZE related tasks per iteration"
     fi
-    log "LIGHT" "Loop: PLAN → EXECUTE → REVIEW → FIX"
+
+    # 找到起始步骤的索引
+    local current_idx=-1
+    for i in "${!STEPS[@]}"; do
+        if [[ "${STEPS[$i]}" == "$initial_step" ]]; then
+            current_idx=$i
+            break
+        fi
+    done
+    if [[ $current_idx -eq -1 ]]; then
+        log "ERROR" "无效步骤:$initial_step"
+        exit 1
+    fi
+
+    log "LIGHT" "Loop: PLAN → EXECUTE → REVIEW → FIX. Initial step: $initial_step, step index:$current_idx."
     log "INFO" "Logs: $LOG_FILE"
     log "INFO" ""
 
@@ -469,30 +497,44 @@ main_loop() {
             ACTIVE_FIX_PROMPT="$FIX_PROMPT"
         fi
 
-        # PLAN
-        run_step "1" "PLAN" "$CONTEXT
+        # 循环执行从起始步骤开始的所有步骤
+        while [[ $current_idx -lt ${#STEPS[@]} ]]; do
+            step="${STEPS[$current_idx]}"
+            
+            case "$step" in
+                "PLAN")
+                    run_step "$current_idx" "$step" "$CONTEXT
 
 $ACTIVE_PLAN_PROMPT" "Analyzing..." "$i"
-
-        if [[ ! -f "$TASK_STATE" ]]; then
-            log "ERROR" "PLAN STEP failed - no .task file"
-            continue
-        fi
-
-        # EXECUTE
-        run_step "2" "EXECUTE" "$CONTEXT
+                    
+                    # PLAN 步骤的特殊检查
+                    if [[ ! -f "$TASK_STATE" ]]; then
+                        log "ERROR" "PLAN STEP failed - no .task file"
+                        break  # 这会跳出 while 循环
+                    fi
+                    ;;
+                    
+                "EXECUTE")
+                    run_step "$current_idx" "$step" "$CONTEXT
 
 $ACTIVE_EXECUTE_PROMPT" "Implementing..." "$i"
-
-        # REVIEW
-        run_step "3" "REVIEW" "$CONTEXT
+                    ;;
+                    
+                "REVIEW")
+                    run_step "$current_idx" "$step" "$CONTEXT
 
 $ACTIVE_REVIEW_PROMPT" "Reviewing..." "$i"
-
-        # FIX
-        run_step "4" "FIX" "$CONTEXT
+                    ;;
+                    
+                "FIX")
+                    run_step "$current_idx" "$step" "$CONTEXT
 
 $ACTIVE_FIX_PROMPT" "Fixing..." "$i"
+                    ;;
+            esac
+            
+            ((current_idx++))  # 移动到下一步
+        done
 
         sleep 2
     done
