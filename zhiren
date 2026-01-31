@@ -227,19 +227,16 @@ if [[ "${1:-}" == "--rebuild" ]]; then
     exit 0
 fi
 
-#==============================================================================
-# REFRESH COMMAND - Add tasks from freeform notes
-#==============================================================================
-if [[ "${1:-}" == "refresh" ]]; then
-    NOTES_FILE="$2"
+refresh_tasks() {
+    local notes_file="$1"
 
-    if [[ -z "$NOTES_FILE" ]]; then
+    if [[ -z "$notes_file" ]]; then
         log "ERROR" "Usage: zhiren refresh <notes.md>"
         exit 1
     fi
 
-    if [[ ! -f "$NOTES_FILE" ]]; then
-        log "ERROR" "Error: $NOTES_FILE not found"
+    if [[ ! -f "$notes_file" ]]; then
+        log "ERROR" "Error: $notes_file not found"
         exit 1
     fi
 
@@ -253,11 +250,11 @@ if [[ "${1:-}" == "refresh" ]]; then
         exit 1
     fi
 
-    log "LIGHT" "Zhiren refreshing project from: $NOTES_FILE"
+    log "LIGHT" "Zhiren refreshing project from: $notes_file"
 
     REFRESH_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_refresh.md")
 
-    NOTES_CONTENT=$(cat "$NOTES_FILE")
+    NOTES_CONTENT=$(cat "$notes_file")
     CONTEXT_CONTENT=$(cat "$CONTEXT_FILE")
     TASKS_CONTENT=$(cat "$TASK_FILE")
 
@@ -290,11 +287,18 @@ $CLAUDE_MD
 $REFRESH_PROMPT" "REFRESH"
 
     # Show result
-    NEW_TASKS=$(grep -c '^\s*- \[ \]' "$TASK_FILE" 2>/dev/null || echo "0")
+    NEW_TASKS=$(grep -c '^\s*- \[ \]' "$TASK_FILE" | xargs 2>/dev/null || echo "0")
     log "SUCCESS" "Project refreshed!"
     log "INFO" "  - $NEW_TASKS pending tasks in $TASK_FILE"
     log "INFO" ""
     log "LIGHT" "Run 'zhiren' to work through the new tasks"
+}
+
+#==============================================================================
+# REFRESH COMMAND - Add tasks from freeform notes
+#==============================================================================
+if [[ "${1:-}" == "refresh" ]]; then
+    refresh_tasks "$2"
 
     exit 0
 fi
@@ -370,7 +374,8 @@ fi
 # Determine max iterations if not set
 if [ -z "$MAX_ITERATIONS" ]; then
     # 根据任务数量动态设置最大迭代次数
-    REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" || echo "0")
+    log "INFO" "TASKS.md file path: $TASK_FILE"
+    REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" | xargs || echo "0")
     if [ "$REMAINING" -eq 0 ]; then
         MAX_ITERATIONS=1
         # 循环里面还会判断剩余任务，这里设置1保证能进入循环一次以打印完成信息
@@ -522,7 +527,7 @@ find_step() {
 
 # Start main loop
 main_loop() {
-    local all_tasks_count=$(grep -c '^\s*- \[[ xX]\]' "$TASK_FILE" 2>/dev/null || echo "0")
+    local all_tasks_count=$(grep -c '^\s*- \[[ xX]\]' "$TASK_FILE" | xargs 2>/dev/null || echo "0")
 
     # Log session start
     log "INFO" "=== Zhiren session started ==="
@@ -571,7 +576,7 @@ main_loop() {
         tasks_completed=$((all_tasks_count - REMAINING))
         tasks_completed_percent=$(awk -v c=$completed -v t=$total 'BEGIN {printf "%.2f", c/t*100}')
 
-        REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" || echo "0")
+        REMAINING=$(grep -c '^\s*- \[ \]' "$TASK_FILE" | xargs || echo "0")
         log "LIGHT2" "=== Iteration $i/$MAX_ITERATIONS ($REMAINING of $all_tasks_count tasks remaining, $tasks_completed_percent complete). $current_step step. ==="
 
         # Select prompts based on batch mode
