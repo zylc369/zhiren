@@ -34,7 +34,7 @@ Actually run the verification steps to confirm the outcome was achieved:
 - All PLAN steps done?
 
 ## Auto-Detect Focus Areas
-Read prompt_review_auto_detect_focus_Areas_rules.md [in PROMPT FRAGMENT DIRECTORY].
+Read prompt_review_auto_detect_focus_Areas_rules.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Run Checks
 Use TEST_COMMAND from .task file (or detect from CONTEXT.md)
@@ -45,7 +45,7 @@ Check what testing infrastructure exists in the project:
 - Testing expectations depend on context (see mode-specific guidance if present)
 
 ## Classify Issues by Type AND Severity
-Read prompt_review_classify_issues_by_type_and_severity_rules.md [in PROMPT FRAGMENT DIRECTORY].
+Read prompt_review_classify_issues_by_type_and_severity_rules.md [in PROMPT SNIPPET DIRECTORY].
 
 ## CRITICAL: Environment Issues Are SOLVABLE, Not Blockers
 If you encounter an environment issue (missing tool, dependency, wrong setup):
@@ -70,12 +70,11 @@ Before flagging unused code, check TASKS.md:
 Don't suppress warnings for scaffolding. Don't keep actual dead code.
 
 ## Append to .task:
-Read prompt_review_append_to_dot_task_rules.md [in PROMPT FRAGMENT DIRECTORY].
+Read prompt_review_append_to_dot_task_rules.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Directory and File Path
-- **Working directory**: \`$ZHIREN_PROJECT_ROOT\`. All relative paths are based here.
-- **TASKS.md**,**CONTEXT.md**,**specs/**: In the first level of the working directory.
-- **PROMPT FRAGMENT DIRECTORY** \`$RESOURCES_PROMPTS_DIR\`.
+- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 EOF
     
     echo "$prompt_content"

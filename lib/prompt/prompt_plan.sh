@@ -30,7 +30,7 @@ Before planning, CONFIRM the task line starts with \`- [ ]\` (space between brac
 If it starts with \`- [x]\`, it's ALREADY DONE - do not plan it, do not create .task file.
 
 ## Write to .task file:
-Read prompt_plan_write_to_task_file.md [in PROMPT FRAGMENT DIRECTORY].
+Read prompt_plan_write_to_task_file.md [in PROMPT SNIPPET DIRECTORY].
 
 ## Architecture Principles
 - REUSE existing code - search first
@@ -40,9 +40,8 @@ Read prompt_plan_write_to_task_file.md [in PROMPT FRAGMENT DIRECTORY].
 - Match existing code style
 
 ## Directory and File Path
-- **Working directory**: \`$ZHIREN_PROJECT_ROOT\`. All relative paths are based here.
-- **TASKS.md**,**CONTEXT.md**,**.task**,**specs/**: In the first level of the working directory.
-- **PROMPT FRAGMENT DIRECTORY** \`$RESOURCES_PROMPTS_DIR\`.
+- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 
 DO NOT implement unless explicitly asked. Just plan.
 EOF

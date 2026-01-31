@@ -53,10 +53,10 @@ Unless user explicitly says "no tests", you MUST include testing:
 ## Phase 3: Create Files
 
 ### 1. CONTEXT.md (static reference for development)
-Read prompt_init_create_context_file_specs.md [in PROMPT FRAGMENT DIRECTORY].
+Read prompt_init_create_context_file_specs.md [in PROMPT SNIPPET DIRECTORY].
 
 ### 2. TASKS.md
-Read prompt_init_create_tasks_file_specs.md [in PROMPT FRAGMENT DIRECTORY].
+Read prompt_init_create_tasks_file_specs.md [in PROMPT SNIPPET DIRECTORY].
 
 ### 3. specs/ folder (only if needed)
 Create specs that ADD VALUE - don't create empty scaffolds:
@@ -76,9 +76,8 @@ Create specs that ADD VALUE - don't create empty scaffolds:
 - **For existing projects**: Don't recreate what already exists!
 
 ## Directory and File Path
-- **Working directory**: \`$ZHIREN_PROJECT_ROOT\`. All relative paths are based here.
-- **TASKS.md**,**CONTEXT.md**,**specs/**: In the first level of the working directory.
-- **PROMPT FRAGMENT DIRECTORY** \`$RESOURCES_PROMPTS_DIR\`.
+- Working directory: \`$ZHIREN_PROJECT_ROOT\`. All relative paths (e.g., .task, TASKS.md, CONTEXT.md, specs/) are relative to this directory.
+- PROMPT SNIPPET DIRECTORY: \`$RESOURCES_PROMPTS_DIR\`.
 
 Read the **IDEA CONTENT**, understand the vision, create the planning files. Implementation happens later.
 EOF
