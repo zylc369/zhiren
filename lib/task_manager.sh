@@ -36,7 +36,7 @@ task_archiving() {
     local target_path="$save_dir/$file_name"
 
     cp -f "$src_path" "$target_path"
-    log "LIGHT3" "The task has been archived, from '$src_path' to '$target_path'."
+    log "INFO" "${LOG_COLOR_BLUE}The task has been archived${LOG_COLOR_NC}, from '$src_path' to '$target_path'."
 }
 
 export -f task_archiving
