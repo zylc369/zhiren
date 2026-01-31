@@ -398,15 +398,34 @@ MAIN_MODE_HEADER="## DEVELOPMENT MODE - Testing Requirements
 load_context() {
     CONTEXT="$MAIN_MODE_HEADER"
     if [[ -f "$CONTEXT_FILE" ]]; then
-        CONTEXT+=$(cat "$CONTEXT_FILE")
+        # CONTEXT+=$(cat "$CONTEXT_FILE")
+        CONTEXT="$CONTEXT
+
+---
+
+## Context from CONTEXT.md
+\`\`\`markdown
+$(cat "$CONTEXT_FILE")
+\`\`\`
+"
     fi
     # Also include CLAUDE.md if exists (project rules)
     if [[ -f "CLAUDE.md" ]]; then
         CONTEXT="$CONTEXT
 
+---
+
 ## Project Rules (from CLAUDE.md):
+\`\`\`markdown
 $(cat CLAUDE.md)"
+\`\`\`
     fi
+
+    CONTEXT="$CONTEXT
+
+---
+
+"
 }
 
 # Detect and setup safe mode if applicable
@@ -425,13 +444,22 @@ run_step() {
     local purpose="${4:-...}"
     local loop_count="${5:-}"
 
-    log "INFO" "First save the current step:$step_name. File Path:$ZHIREN_CURRENT_STEP_FILE"
+    log "INFO" "First save the current step:$step_name. File Path:$ZHIREN_CURRENT_STEP_FILE" >&2
     echo -n "$step_name" > "$ZHIREN_CURRENT_STEP_FILE"
 
     log "LIGHT3" "[${step_num}/4 ${step_name}] $purpose"
     if ! inner_run_claude "$use_prompt" "$step_name" "$loop_count"; then
-        log "ERROR" "$step_name STEP failed after $MAX_RETRIES retries - aborting"
+        log "ERROR" "$step_name STEP failed after $MAX_RETRIES retries - aborting" >&2
         exit 1
+    fi
+
+    # PLAN 步骤的特殊检查
+    if [[ "$step_name" == "PLAN" ]]; then
+        if [[ ! -f "$TASK_STATE" ]]; then
+            log "ERROR" "PLAN STEP failed: No .task file found. Continuing with PLAN STEP." >&2
+            echo "TASK_NOT_GENERATED"
+            return
+        fi
     fi
 
     local next_step=""
@@ -444,19 +472,28 @@ run_step() {
         # step_num是数组索引+1，所以下一个步骤直接将它当做索引
         next_step="${STEPS[$step_num]}"
     fi
-    log "INFO" "Save the next step:$next_step. File Path:$ZHIREN_CURRENT_STEP_FILE"
+    log "INFO" "Save the next step:$next_step. File Path:$ZHIREN_CURRENT_STEP_FILE" >&2
     echo -n "$next_step" > "$ZHIREN_CURRENT_STEP_FILE"
 }
 
 find_step() {
-    local current_step="$1"
-    for i in "${!STEPS[@]}"; do
-        if [[ "${STEPS[$i]}" == "$current_step" ]]; then
-            echo "$1"
-            return
+    local target_step="$1"  # 使用更有意义的变量名
+    local index
+    
+    # echo "DEBUG: Looking for step: $target_step" >&2
+    
+    for index in "${!STEPS[@]}"; do
+        # echo "DEBUG: Checking index $index: ${STEPS[$index]}" >&2
+        if [[ "${STEPS[$index]}" == "$target_step" ]]; then
+            # echo "DEBUG: Found at index $index" >&2
+            echo "$index"
+            return 0
         fi
     done
+    
+    # echo "DEBUG: Step '$target_step' not found" >&2
     echo "-1"
+    # return 1
 }
 
 # Start main loop
@@ -475,6 +512,7 @@ main_loop() {
     log "INFO" "Logs: $LOG_FILE"
     log "INFO" ""
 
+    local i
     for i in $(seq 1 $MAX_ITERATIONS); do
         local current_step="PLAN"
         if [[ -s "$ZHIREN_CURRENT_STEP_FILE" ]]; then
@@ -520,13 +558,11 @@ main_loop() {
             
             case "$step" in
                 "PLAN")
-                    run_step "$step_num" "$step" "$CONTEXT
+                    local run_step_result=$(run_step "$step_num" "$step" "$CONTEXT
 
-$ACTIVE_PLAN_PROMPT" "Analyzing..." "$i"
-                    
+$ACTIVE_PLAN_PROMPT" "Analyzing..." "$i")
                     # PLAN 步骤的特殊检查
-                    if [[ ! -f "$TASK_STATE" ]]; then
-                        log "ERROR" "PLAN STEP failed - no .task file"
+                    if [[ "$run_step_result" == "TASK_NOT_GENERATED" ]]; then
                         break  # 这会跳出 while 循环
                     fi
                     ;;
