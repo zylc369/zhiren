@@ -73,8 +73,9 @@ refresh_tasks() {
     local tasks_content=$(cat "$TASK_FILE")
 
     local user_prompt="# USER'S NOTES:
-
+\`\`\`markdown
 $notes_content
+\`\`\`
 
 ---
 
