@@ -109,6 +109,9 @@ install() {
     # Create zhiren-clean-project command
     inner_install "zhiren-clean-project" "zhiren_clean_project"
 
+    # Create zhiren-refresh command
+    inner_install "zhiren-refresh" "zhiren_refresh"
+
     log ""
 }
 
