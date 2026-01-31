@@ -61,6 +61,7 @@ ZHIREN_CURRENT_STEP_FILE="${PROJECT_ZHIREN_DIR}/zhiren_current_step"
 # Source library components
 source "$SCRIPT_DIR/lib/log.sh"
 source "$SCRIPT_DIR/lib/prompts.sh"
+source "$SCRIPT_DIR/lib/task_manager.sh"
 source "$SCRIPT_DIR/lib/safe_mode.sh"
 source "$SCRIPT_DIR/lib/claude.sh"
 
