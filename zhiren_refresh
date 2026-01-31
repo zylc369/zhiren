@@ -23,22 +23,22 @@ refresh_tasks() {
     local notes_file="$1"
 
     if [[ -z "$notes_file" ]]; then
-        log "ERROR" "Usage: zhiren refresh <notes.md>"
+        log "ERROR" "Usage: zhiren-refresh <notes.md>"
         exit 1
     fi
 
     if [[ ! -f "$notes_file" ]]; then
-        log "ERROR" "Error: $notes_file not found"
+        log "ERROR" "Error: file '$notes_file' not found"
         exit 1
     fi
 
     if [[ ! -f "$CONTEXT_FILE" ]]; then
-        log "ERROR" "Error: $CONTEXT_FILE not found - run 'zhiren init' first"
+        log "ERROR" "Error: file '$CONTEXT_FILE' not found - run 'zhiren init' first"
         exit 1
     fi
 
     if [[ ! -f "$TASK_FILE" ]]; then
-        log "ERROR" "Error: $TASK_FILE not found - run 'zhiren init' first"
+        log "ERROR" "Error: file '$TASK_FILE' not found - run 'zhiren init' first"
         exit 1
     fi
 
@@ -105,4 +105,5 @@ $refresh_prompt"
     log "LIGHT" "Run 'zhiren' to work through the new tasks"
 }
 
-refresh_tasks "$1"
+NOTES_FILE="${1:-}"
+refresh_tasks "$NOTES_FILE"
