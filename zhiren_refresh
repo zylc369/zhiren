@@ -6,6 +6,19 @@ set -eu
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
 
+# 场景
+export ZHIREN_EXECUTE_SCENE="refresh"
+
+# session相关变量
+ZHIREN_CLAUDE_SESSION_IS_NEW="true"
+ZHIREN_CLAUDE_SESSION_ID=$(uuidgen)
+
+# Instance-specific temp folder for verbose command output
+# Uses PID + timestamp for uniqueness across concurrent instances
+ZHIREN_INSTANCE_ID="$$_$(date +%s)"
+ZHIREN_TMP_DIR="/tmp/zhiren-${ZHIREN_EXECUTE_SCENE}-${ZHIREN_INSTANCE_ID}"
+export ZHIREN_TMP_DIR
+
 # Source library components
 source "$SCRIPT_DIR/lib/tools.sh"
 source "$SCRIPT_DIR/lib/consts.sh"
@@ -16,8 +29,17 @@ source "$SCRIPT_DIR/lib/task_manager.sh"
 source "$SCRIPT_DIR/lib/safe_mode.sh"
 source "$SCRIPT_DIR/lib/claude.sh"
 
-# 场景
-export ZHIREN_EXECUTE_SCENE="refresh"
+log "LIGHT" "🚀 Starting Zhiren refresh tasks script..."
+log "INFO" "ZHIREN_EXECUTE_SCENE=$ZHIREN_EXECUTE_SCENE"
+log "INFO" "SCRIPT_DIR=$SCRIPT_DIR"
+log "INFO" "ZHIREN_HOME=$ZHIREN_HOME"
+log "INFO" "ZHIREN_PROJECT_ROOT=$ZHIREN_PROJECT_ROOT"
+log "INFO" "LOG_DIR=$LOG_DIR"
+log "INFO" "LOG_FILE=$LOG_FILE"
+log "INFO" "ZHIREN_TMP_DIR=$ZHIREN_TMP_DIR"
+log "INFO" "ZHIREN_CLAUDE_SESSION_IS_NEW=$ZHIREN_CLAUDE_SESSION_IS_NEW"
+log "INFO" "ZHIREN_CLAUDE_SESSION_ID=$ZHIREN_CLAUDE_SESSION_ID"
+log "INFO" ""
 
 refresh_tasks() {
     local notes_file="$1"
@@ -85,7 +107,6 @@ $CLAUDE_MD"
 
 $refresh_prompt"
 
-    init_claude_session
     local zhiren_step="REFRESH"
     run_claude "user_prompt" "$user_prompt" \
         "phase" "$zhiren_step" \
