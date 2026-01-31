@@ -32,6 +32,9 @@ source "$SCRIPT_DIR/lib/safe_mode.sh"
 source "$SCRIPT_DIR/lib/claude.sh"
 
 log "LIGHT" "🚀 Starting Zhiren initialization script..."
+
+source "$SCRIPT_DIR/lib/session_manager.sh"
+
 log "INFO" "ZHIREN_EXECUTE_SCENE=$ZHIREN_EXECUTE_SCENE"
 log "INFO" "SCRIPT_DIR=$SCRIPT_DIR"
 log "INFO" "ZHIREN_HOME=$ZHIREN_HOME"
