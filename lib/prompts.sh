@@ -37,24 +37,15 @@ get_verbose_output_rules() {
 - **Database tools**: migrations, db:push, db:pull, prisma, drizzle, typeorm, sequelize
 - **Linters/Formatters**: eslint, prettier, black, flake8, clippy
 
-### REQUIRED PATTERN - Use this exact format, the wildcard \`*\` represents any number of arguments:
+### REQUIRED PATTERN - Use this exact format:
+The wildcard \`*\` represents any number of arguments. \`(a/b/...)\` indicates that any command within the parentheses (e.g., a or b):
 \`\`\`bash
 # CORRECT - redirect and show exit code:
-npm * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
-pip * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
-pip3 * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
+(npm/cargo/pippip3/pytest/mvn/gradlew) * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
 cargo build > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
-pytest > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
-mvn * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
-gradlew * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
 
 # WRONG - never do this:
-npm *          # FORBIDDEN
-pip *          # FORBIDDEN
-pip3 *         # FORBIDDEN
-cargo build    # FORBIDDEN
-mvn *          # FORBIDDEN
-gradlew *      # FORBIDDEN
+(npm/cargo/pip/pip3/mvn/gradlew) *     # FORBIDDEN
 \`\`\`
 
 ### After running, check results with:
