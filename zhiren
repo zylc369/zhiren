@@ -1,36 +1,4 @@
 #!/bin/bash
-# Zhiren - Autonomous AI development system
-#
-# Commands:
-#   zhiren refresh <notes.md>       - Add tasks from freeform notes
-#   zhiren task [opts] "desc"       - Run isolated single-task mode
-#   zhiren [opts] [n]               - Run n iterations (default 25)
-#   zhiren --rebuild                - Force rebuild Docker image (safe mode only)
-#   zhiren --disable-auto-update    - Disable automatic update checks
-#   zhiren --enable-auto-update     - Re-enable automatic update checks
-#
-# Main loop options:
-#   --batch             - Enable batch mode (up to 5 related tasks per iteration)
-#   --batch=N, -bN      - Enable batch mode with custom size (up to N tasks)
-#                         Tasks are grouped by natural relatedness, not forced
-#
-# Task mode options:
-#   --safe              - Run in Docker container
-#   -f, --file <file>   - Read task description from file
-#   --branch <name>     - Use custom branch name
-#   --no-pr             - Skip PR creation
-#   -n <num>            - Max iterations (default 25)
-#
-# Safe mode (--safe): Runs Claude in a Docker container that can only access
-# the project directory. Use for unattended runs to prevent accidental
-# damage to other files on the system.
-#
-# Loop: PLAN → EXECUTE → REVIEW → FIX
-#
-# Task mode: Isolated single-task fixes. Does NOT touch CONTEXT.md, TASKS.md.
-# Uses .zhiren/tasks/<task-id>/ for state. Auto-creates branch and PR if git/gh available.
-#
-# idea.md/notes.md are freeform - write whatever you want. Zhiren will figure it out.
 
 # -e: 命令失败时立即退出
 # -u: 使用未定义变量时报错
