@@ -38,14 +38,13 @@ get_verbose_output_rules() {
 - **Linters/Formatters**: eslint, prettier, black, flake8, clippy
 
 ### REQUIRED PATTERN - Use this exact format:
-The wildcard \`*\` represents any number of arguments. \`(a/b/...)\` indicates that any command within the parentheses (e.g., a or b):
+The wildcard \`*\` represents any number of arguments, \`{a,b}\` means use a or b:
 \`\`\`bash
 # CORRECT - redirect and show exit code:
-(npm/cargo/pippip3/pytest/mvn/gradlew) * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
-cargo build > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
+{npm,cargo,pippip3,pytest,mvn,gradlew} * > $zhiren_tmp_dir/command_process.log 2>&1; echo "Exit code: \$?"
 
 # WRONG - never do this:
-(npm/cargo/pip/pip3/mvn/gradlew) *     # FORBIDDEN
+{npm,cargo,pip,pip3,mvn,gradlew} *     # FORBIDDEN
 \`\`\`
 
 ### After running, check results with:
