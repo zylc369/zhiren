@@ -1,6 +1,6 @@
 # Zhiren
 
-> Zhiren (致人) - 一个 "Ralph Loop" AI 驱动的自动化开发系统
+> Zhiren (智人) - 一个 "Ralph Loop" AI 驱动的自动化开发系统
 
 Zhiren 是一个能够循环调用 Claude Code 直到满足用户需求的自动化开发工具。通过持续的 PLAN（规划）→ EXECUTE（执行）→ REVIEW（审查）→ FIX（修复）循环，Zhiren 可以自主地完成软件开发任务。
 
