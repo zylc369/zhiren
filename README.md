@@ -37,14 +37,14 @@ Zhiren 实现了 "Ralph Loop" 模式 - 一个持续的反馈循环，确保代�
 ### 前置要求
 
 - [Anthropic Claude Code CLI](https://claude.ai/code) 已安装
-- Bash 4.0+
+- Bash 3.2+（macOS 默认版本即可）
 - （可选）Docker - 用于 Safe Mode
 
 ### 安装步骤
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/zhiren.git
+git clone [链接]
 cd zhiren
 
 # 执行安装
