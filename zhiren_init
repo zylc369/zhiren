@@ -259,6 +259,18 @@ init_git_repo() {
         log "ERROR" "  - git init failed"
         return
     fi
+
+    if [[ ! -f .gitignore ]]; then
+        # 创建基本的 .gitignore 内容
+        cat > .gitignore << 'EOF'
+.DS_Store
+
+node_modules/
+__pycache__/
+*.pyc
+EOF
+        log "INFO" "  - Created .gitignore file"
+    fi
     
     git add -A
     if git commit -m "Initial project setup by Zhiren"; then
