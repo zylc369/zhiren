@@ -22,6 +22,8 @@ source "$SCRIPT_DIR/lib/date_utils.sh"
 
 # 当前执行的步骤记录文件
 ZHIREN_CURRENT_STEP_FILE="${PROJECT_ZHIREN_DIR}/zhiren_current_step"
+# 默认不使用Git提交代码
+ENABLE_AUTO_GIT_COMMIT=false
 
 # Source library components
 source "$SCRIPT_DIR/lib/log.sh"
@@ -209,6 +211,10 @@ while [[ $# -gt 0 ]]; do
             MAX_ITERATIONS="$1"
             shift
             ;;
+        --git-auto-commit)
+            ENABLE_AUTO_GIT_COMMIT=true
+            shift
+            ;;
         *)
             log "ERROR" "Unknown option: $1"
             log "INFO" "Usage: zhiren [options] [iterations]"
@@ -216,6 +222,7 @@ while [[ $# -gt 0 ]]; do
             log "INFO" "  --batch       Enable batch mode (up to 5 related tasks)"
             log "INFO" "  --batch=N     Enable batch mode with custom size"
             log "INFO" "  -b, -bN       Short form of --batch, --batch=N"
+            log "INFO" "  --git-auto-commit  代码自动提交到Git仓库"
             exit 1
             ;;
     esac
@@ -226,6 +233,16 @@ if [[ ! -f "$TASK_FILE" ]]; then
     log "ERROR" "Error: $TASK_FILE not found"
     log "INFO" "Run 'zhiren init <idea.md>' first"
     exit 1
+fi
+
+if [[ "$ENABLE_AUTO_GIT_COMMIT" == "true" ]]; then
+    if ! command -v git &> /dev/null; then
+        ENABLE_AUTO_GIT_COMMIT="false"
+        log "WARN" "Git command not found, cannot commit automatically."
+    elif ! git rev-parse --git-dir &> /dev/null 2>&1; then
+        ENABLE_AUTO_GIT_COMMIT="false"
+        log "WARN" "Git repository does not exist, cannot auto-commit."
+    fi
 fi
 
 # Determine max iterations if not set

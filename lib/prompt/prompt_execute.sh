@@ -5,6 +5,12 @@
 set -eu
 
 get_execute_prompt() {
+    local commit_prompt=""
+    if [[ "$ENABLE_AUTO_GIT_COMMIT" == "true" ]]; then
+        commit_prompt='Then commit: "feat: [task description]"
+'
+    fi
+
     read -r -d '' prompt_content << EOF
 # EXECUTE STEP
 
@@ -33,7 +39,13 @@ You may read files when needed for implementation, but prioritize writing code o
 - Comments explain WHY not WHAT
 
 ## When Done
-Read prompt_snippet_execute_when_done.md [in PROMPT SNIPPET DIRECTORY].
+Mark the task complete in TASKS.md with a short note if you learned something useful:
+- Simple completion: \`- [x] Task description\`
+- With note: \`- [x] Task description → Note: [one-line insight]\`
+
+Only add a note if it would help future tasks (e.g., "used X instead of Y", "requires Z first").
+
+$commit_prompt
 EOF
     
     echo "$prompt_content"

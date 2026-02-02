@@ -5,6 +5,11 @@
 set -eu
 
 get_fix_prompt() {
+    local commit_fixes=""
+    if [[ "$ENABLE_AUTO_GIT_COMMIT" == "true" ]]; then
+        commit_fixes='Commit fixes: "fix: [description]"
+'
+    fi
     read -r -d '' prompt_content << EOF
 # FIX STEP
 
@@ -54,7 +59,7 @@ Read prompt_snippet_fix_handling_env_issues.md [in PROMPT SNIPPET DIRECTORY].
 2. Fix ISSUES (should fix)
 3. Consider SUGGESTIONS (nice to have)
 4. Re-run TEST_COMMAND to confirm
-5. Commit fixes: "fix: [description]"
+$commit_fixes
 
 **IMPORTANT: Fix ALL flagged issues, not just ones from the current task.**
 If REVIEW flagged a pre-existing issue (broken build, failing db:push, etc.),
