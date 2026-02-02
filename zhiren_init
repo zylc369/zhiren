@@ -231,7 +231,7 @@ run_claude "user_prompt" "$user_prompt" \
     "session_is_new" "true" \
     "session_id" "$ZHIREN_CLAUDE_SESSION_ID" \
     "save_mode" "false"
-local claude_exit_code=$?
+claude_exit_code=$?
 if [[ ! $claude_exit_code -eq 0 ]]; then
     log "ERROR" "[$zhiren_step] Claude failed, exit code $claude_exit_code"
     exit $claude_exit_code

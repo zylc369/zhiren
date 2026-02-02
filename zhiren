@@ -103,15 +103,6 @@ inner_run_claude() {
     exit $claude_exit_code
 }
 
-#==============================================================================
-# PROMPTS - Defined early so both task mode and main loop can use them
-#==============================================================================
-
-PLAN_PROMPT=$(get_plan_prompt)
-EXECUTE_PROMPT=$(get_execute_prompt)
-REVIEW_PROMPT=$(get_review_prompt)
-FIX_PROMPT=$(get_fix_prompt)
-
 
 #==============================================================================
 # GIT/GH DETECTION FUNCTIONS (for task command)
@@ -242,6 +233,9 @@ if [[ "$ENABLE_AUTO_GIT_COMMIT" == "true" ]]; then
     elif ! git rev-parse --git-dir &> /dev/null 2>&1; then
         ENABLE_AUTO_GIT_COMMIT="false"
         log "WARN" "Git repository does not exist, cannot auto-commit."
+    fi
+    else
+        log "LIGHT" "Code will be automatically committed to the repository."
     fi
 fi
 
@@ -460,10 +454,10 @@ main_loop() {
             ACTIVE_REVIEW_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_review.md")
             ACTIVE_FIX_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_fix.md")
         else
-            ACTIVE_PLAN_PROMPT="$PLAN_PROMPT"
-            ACTIVE_EXECUTE_PROMPT="$EXECUTE_PROMPT"
-            ACTIVE_REVIEW_PROMPT="$REVIEW_PROMPT"
-            ACTIVE_FIX_PROMPT="$FIX_PROMPT"
+            ACTIVE_PLAN_PROMPT=$(get_plan_prompt)
+            ACTIVE_EXECUTE_PROMPT=$(get_execute_prompt)
+            ACTIVE_REVIEW_PROMPT=$(get_review_prompt)
+            ACTIVE_FIX_PROMPT=$(get_fix_prompt)
         fi
 
         # 循环执行从起始步骤开始的所有步骤
