@@ -453,10 +453,10 @@ main_loop() {
             ACTIVE_REVIEW_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_review.md")
             ACTIVE_FIX_PROMPT=$(cat "${SCRIPT_DIR}/resources/prompt_batch_fix.md")
         else
-            ACTIVE_PLAN_PROMPT=$(get_plan_prompt)
-            ACTIVE_EXECUTE_PROMPT=$(get_execute_prompt)
-            ACTIVE_REVIEW_PROMPT=$(get_review_prompt)
-            ACTIVE_FIX_PROMPT=$(get_fix_prompt)
+            ACTIVE_PLAN_PROMPT="$(get_plan_prompt)"
+            ACTIVE_EXECUTE_PROMPT="$(get_execute_prompt)"
+            ACTIVE_REVIEW_PROMPT="$(get_review_prompt)"
+            ACTIVE_FIX_PROMPT="$(get_fix_prompt)"
         fi
 
         # 循环执行从起始步骤开始的所有步骤

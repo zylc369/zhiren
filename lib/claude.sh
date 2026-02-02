@@ -85,7 +85,10 @@ run_claude() {
 
     #----------------------------------------------------------------------------
     # APPEND verbose output rules to ALL prompts (at end = more prominent)
-    local prompt="$user_prompt"
+    local prompt="
+Time: $(get_basic_timestamp)
+
+$user_prompt"
     if [[ "$disable_verbose_output_rules_prompt" != "true" ]]; then
         prompt="${prompt}
 
