@@ -53,6 +53,8 @@ log "INFO" ""
 # Parse --safe flag and idea file
 INIT_SAFE_MODE=false
 IDEA_FILE=""
+# Git仓库不存在的情况下，是否初始化仓库
+ENABLE_GIT_REPO_INIT=false
 
 # Helper 函数：显示帮助信息
 show_help() {
@@ -60,9 +62,10 @@ show_help() {
 用法: $0 [选项]
 
 选项:
-  --safe          启用安全模式
-  -f, --file FILE 指定 IDEA 文件路径（必需）
-  -h, --help      显示此帮助信息
+  --safe                    启用安全模式
+  -f, --file FILE           指定 IDEA 文件路径（必需）
+  -h, --help                显示此帮助信息
+  --git-repo-init    Git仓库不存在的情况下，初始化仓库
 
 示例:
   $0 --safe --file /path/to/project.idea
@@ -95,6 +98,10 @@ while [[ $# -gt 0 ]]; do
             fi
             IDEA_FILE="$2"  # 正确的：取下一个参数作为文件路径
             shift 2  # 跳过两个参数（选项和值）
+            ;;
+        --git-repo-init)
+            ENABLE_GIT_REPO_INIT=true
+            shift
             ;;
         -h|--help)
             show_help
@@ -230,6 +237,37 @@ if [[ ! $claude_exit_code -eq 0 ]]; then
     exit $claude_exit_code
 fi
 
+# Init git repo if git available and not already in a repo
+init_git_repo() {
+    if ! command -v git &> /dev/null; then
+        log "WARN" "Git command not found."
+        return
+    fi
+
+    if git rev-parse --git-dir &> /dev/null 2>&1; then
+        log "LIGHT" "Git repository already exists."
+        return
+    fi
+
+    if [[ "$ENABLE_GIT_REPO_INIT" != "true" ]]; then
+        log "WARN" "Git repository does not exist, not initializing."
+        return
+    fi
+    
+    log "LIGHT" "Git repository does not exist, starting initialization."
+    if ! git init -q; then
+        log "ERROR" "  - git init failed"
+        return
+    fi
+    
+    git add -A
+    if git commit -m "Initial project setup by Zhiren"; then
+        log "INFO" "  - git repo initialized"
+    else
+        log "WARN" "  - git repo initialized but initial commit failed"
+    fi
+}
+
 # Verify files were created
 if [[ -f "$CONTEXT_FILE" ]] && [[ -f "$TASK_FILE" ]]; then
     log "SUCCESS" "Project initialized!"
@@ -238,14 +276,8 @@ if [[ -f "$CONTEXT_FILE" ]] && [[ -f "$TASK_FILE" ]]; then
     [[ -d "$SPECS_DIR" ]] && log "INFO" "  - $SPECS_DIR/"
 
     # Init git repo if git available and not already in a repo
-    if command -v git &> /dev/null; then
-        if ! git rev-parse --git-dir &> /dev/null 2>&1; then
-            git init -q && \
-            git add -A && \
-            git commit -q -m "Initial project setup by Zhiren" && \
-            log "INFO" "  - git repo initialized" || true
-        fi
-    fi
+    init_git_repo
+
 
     # Generate Docker config if --safe flag was used
     if [[ "$INIT_SAFE_MODE" == true ]]; then
