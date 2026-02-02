@@ -233,7 +233,6 @@ if [[ "$ENABLE_AUTO_GIT_COMMIT" == "true" ]]; then
     elif ! git rev-parse --git-dir &> /dev/null 2>&1; then
         ENABLE_AUTO_GIT_COMMIT="false"
         log "WARN" "Git repository does not exist, cannot auto-commit."
-    fi
     else
         log "LIGHT" "Code will be automatically committed to the repository."
     fi

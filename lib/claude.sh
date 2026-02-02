@@ -161,6 +161,7 @@ $(get_file_maps_prompt)"
             # 设置Ctrl+C处理
             trap 'echo -e "\n检测到Ctrl+C，正在终止..." >&2; exit 130' INT
 
+            log "INFO" "Preparing to call Claude Code"
             # Run on host (existing behavior), capture output
             # -p: 打印响应并退出（适用于管道操作）。注意：当Claude以-p模式运行时，会跳过工作区信任对话框。请仅在受信任的目录中使用此标志。
             # --dangerously-skip-permissions: 绕过所有权限检查。建议仅在无网络访问的沙箱环境中使用。
