@@ -155,9 +155,10 @@ Zhiren 会保留现有的 CONTEXT.md 和 TASKS.md，并将新任务添加到任�
 zhiren-init [选项]
 
 选项:
-  -f, --file FILE    指定需求文档路径（必需，或使用当前目录的 idea.md）
-  --safe             启用 Safe Mode（Docker 隔离环境）
-  -h, --help         显示帮助信息
+  -f, --file FILE      指定需求文档路径（必需，或使用当前目录的 idea.md）
+  --safe               启用 Safe Mode（Docker 隔离环境）
+  --git-repo-init      Git 仓库不存在时初始化仓库（默认不初始化）
+  -h, --help           显示帮助信息
 ```
 
 **功能：**
@@ -165,7 +166,7 @@ zhiren-init [选项]
 - 自动识别技术栈（Node.js、Python、Go、Rust 等）
 - 生成初始任务列表和项目上下文
 - 可选启用 Safe Mode
-- 自动初始化 Git 仓库
+- 可选初始化 Git 仓库（使用 `--git-repo-init`）
 
 ### zhiren
 
@@ -175,11 +176,12 @@ zhiren-init [选项]
 zhiren [选项] [迭代次数]
 
 选项:
-  --batch[=N]        启用批量模式（默认处理 5 个相关任务）
-  -b, -bN            批量模式的简写形式
+  --batch[=N]          启用批量模式（默认处理 5 个相关任务）
+  -b, -bN              批量模式的简写形式
+  --git-auto-commit    自动提交代码到 Git 仓库（默认不自动提交）
 
 参数:
-  迭代次数           最大迭代次数（默认：2 × 剩余任务数）
+  迭代次数             最大迭代次数（默认：2 × 剩余任务数）
 ```
 
 **功能：**
@@ -187,6 +189,7 @@ zhiren [选项] [迭代次数]
 - 自动保存进度（可从任意阶段恢复）
 - 完成任务自动归档
 - 支持批量处理相关任务
+- 可选自动提交代码（使用 `--git-auto-commit`）
 
 ### zhiren-refresh
 
